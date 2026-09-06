@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Who Knows? — Live-Band für Rock, Blues & Country</title>
+  <meta
+    name="description"
+    content="Who Knows? ist eine sechsköpfige Live-Band für Rock, Blues und Country – für Konzerte, Festivals und private Feiern. Jetzt Termin anfragen."
+  />
+
+  <!-- ==========================================================================
+       TAILWIND CSS (über CDN eingebunden — kein Build-Schritt nötig, funktioniert
+       direkt auf GitHub Pages). Für ein noch schlankeres Setup könnt ihr Tailwind
+       später per npm/CLI selbst bauen; für diese Seite reicht die CDN-Variante
+       performant aus. Die tailwind.config unten definiert nur die eigenen
+       Design-Tokens (Farben/Fonts) als Utility-Klassen, z. B. bg-ink, text-rust.
+       ========================================================================== -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: "#14100c",
+            "ink-2": "#1c1712",
+            charcoal: "#241d16",
+            paper: "#ece2cb",
+            "paper-dim": "#c8bb9a",
+            rust: "#a8462b",
+            "rust-light": "#c65f3f",
+            gold: "#c79a3e",
+          },
+          fontFamily: {
+            display: ["Anton", "Arial Narrow", "sans-serif"],
+            body: ["Work Sans", "Segoe UI", "sans-serif"],
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Google Fonts: Anton (Plakat-Headlines) + Work Sans (Fließtext/UI) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Eigene Styles (Design-Tokens, Komponenten, Animationen) -->
+  <link rel="stylesheet" href="assets/css/style.css" />
+
+  <!-- EmailJS: ermöglicht E-Mail-Versand direkt aus dem Browser, ohne eigenes
+       Backend — nötig, weil GitHub Pages nur statische Dateien ausliefert.
+       Konfiguration (Public Key etc.) erfolgt in assets/js/main.js, siehe
+       Kommentar dort ("E-MAIL-VERSAND ÜBER EMAILJS"). -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+  <!-- Firebase: liefert die öffentliche Bewertungsfunktion, die Speicherung
+       von Buchungs-/Kontaktanfragen fürs Admin-Dashboard, den Besucherzähler
+       und den Admin-Login. Konfiguration in assets/js/firebase-config.js,
+       siehe Kommentar dort. Nutzt die "compat"-Variante der Firebase-SDKs,
+       damit kein Build-Tool nötig ist (einfache <script>-Tags, kein
+       ES-Module-Bundling). -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+  <script src="assets/js/firebase-config.js"></script>
+</head>
+
+<body class="font-body bg-ink text-paper">
+  <!-- ==========================================================================
+       LADEBILDSCHIRM (Preloader)
+       --------------------------------------------------------------------------
+       Eigenständiger Vollbild-Ladebildschirm, der VOR der eigentlichen Seite
+       gezeigt wird (deckt alles ab, auch den Header) und sich nach genau
+       2 Sekunden automatisch ausblendet und zur Homepage weiterspringt.
+       Zeigt das Logo als Wasserzeichen (dieselbe freigestellte Version wie
+       im Hero-Hintergrund) sowie einen schlichten Ladebalken, keine
+       Prozentanzeige. Steuerung komplett in assets/js/main.js, Abschnitt
+       "PRELOADER" (Dauer über PRELOADER_DURATION_MS anpassbar). Blendet
+       sich für Personen mit aktivierter "Bewegung reduzieren"-Einstellung
+       sofort aus.
+       ========================================================================== -->
+  <div id="preloader" class="preloader" aria-hidden="true">
+    <div class="preloader-glow"></div>
+    <img src="assets/img/logo-watermark-light.png" alt="" class="preloader-logo" />
+    <div class="preloader-bar-track">
+      <div id="preloader-bar-fill" class="preloader-bar-fill"></div>
+    </div>
+  </div>
+
+  <a
+    href="#main-content"
+    class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-rust focus:text-paper focus:px-4 focus:py-2 focus:rounded"
+  >
+    Zum Inhalt springen
+  </a>
+
+  <!-- ==========================================================================
+       NAVIGATION
+       ========================================================================== -->
+  <header class="site-nav fixed top-0 inset-x-0 z-40">
+    <!-- NÄCHSTER-AUFTRITT-STREIFEN:
+         Schmale Leiste über der eigentlichen Navigation, zeigt automatisch
+         den nächsten kommenden Termin aus dem "shows"-Array in main.js
+         (Abschnitt "TERMINE"). Neuen Termin ergänzen -> erscheint hier
+         automatisch, keine Anpassung an dieser Stelle nötig. Ohne
+         anstehende Termine bleibt die Leiste ausgeblendet. -->
+    <div id="next-show-bar" class="hidden next-show-bar h-9 sm:h-10 gap-2 sm:gap-3 px-4">
+      <a href="#termine" class="flex items-center gap-2 sm:gap-3 justify-center h-full hover:underline underline-offset-2">
+        <!-- Wasserzeichen-Logo links/rechts vom Termin-Text: über h-full so
+             groß wie möglich, ohne dass die Leiste dadurch höher wird
+             (object-contain hält das Seitenverhältnis, w-auto passt die
+             Breite automatisch an). -->
+        <img src="assets/img/logo-watermark.png" alt="" aria-hidden="true" class="h-full w-auto object-contain opacity-90 shrink-0" />
+        <span id="next-show-text" class="font-bold text-xs sm:text-sm"></span>
+        <img src="assets/img/logo-watermark.png" alt="" aria-hidden="true" class="h-full w-auto object-contain opacity-90 shrink-0" />
+      </a>
+    </div>
+
+    <div class="max-w-6xl mx-auto px-5 sm:px-8 h-20 flex items-center justify-between">
+      <a href="#top" class="flex items-center gap-3 shrink-0">
+        <!-- BAND-LOGO:
+             Rundes Badge nutzt assets/img/logo-badge.png (quadratisch
+             zugeschnittene Variante von assets/img/logo.png, damit der
+             Kreis im Header nicht durch das rechteckige Originalbild
+             abgeschnitten wirkt). Wollt ihr ein neues Logo einsetzen: legt
+             die Datei einfach unter demselben Namen ab, oder passt den
+             Pfad hier an. Größe steuert ihr über h-*/w-* (aktuell h-16 = 64px). -->
+        <img
+          src="assets/img/logo-badge.png"
+          alt="Who Knows? Logo"
+          class="h-16 w-16 rounded-full object-cover shrink-0 ring-1 ring-white/10"
+        />
+        <span class="font-display text-lg tracking-wide hidden sm:inline">Who Knows?</span>
+      </a>
+
+      <nav class="hidden md:flex items-center gap-8" aria-label="Hauptnavigation">
+        <a href="#band" class="nav-link text-sm">Band</a>
+        <a href="#termine" class="nav-link text-sm">Termine</a>
+        <a href="#reviews" class="nav-link text-sm">Stimmen</a>
+        <a href="#galerie" class="nav-link text-sm">Galerie</a>
+        <a href="#media" class="nav-link text-sm">Musik</a>
+        <button
+          type="button"
+          data-open-booking
+          class="btn-primary text-sm px-5 py-2.5 rounded-sm"
+        >
+          Jetzt buchen
+        </button>
+        <!-- Admin-Login: führt zur separaten admin.html (Login + Dashboard
+             mit Besucherstatistik, Buchungs-/Kontaktanfragen und
+             Bewertungs-Freigabe). Für die Öffentlichkeit unauffällig, aber
+             bewusst nicht versteckt — die eigentliche Absicherung passiert
+             über Firebase Auth + Firestore-Regeln, nicht über Verstecken
+             des Links. -->
+        <a
+          href="admin.html"
+          class="nav-link text-sm flex items-center gap-1.5"
+          aria-label="Admin-Login"
+          title="Admin-Login"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 0 1 6 0v3H9zm3 4a2 2 0 0 1 1 3.73V19a1 1 0 1 1-2 0v-1.27A2 2 0 0 1 12 14z"/></svg>
+          Login
+        </a>
+      </nav>
+
+      <!-- Burger-Menü (nur mobil sichtbar) -->
+      <button
+        id="nav-toggle"
+        type="button"
+        class="md:hidden relative w-9 h-9 flex flex-col items-center justify-center gap-[5px]"
+        aria-label="Menü öffnen"
+        aria-expanded="false"
+        aria-controls="mobile-menu"
+      >
+        <span class="burger-line block w-6 h-[2px] bg-paper"></span>
+        <span class="burger-line block w-6 h-[2px] bg-paper"></span>
+        <span class="burger-line block w-6 h-[2px] bg-paper"></span>
+      </button>
+    </div>
+
+    <!-- Mobile Menü -->
+    <nav
+      id="mobile-menu"
+      class="hidden md:hidden flex-col gap-1 px-5 pb-5 border-t border-white/10"
+      aria-label="Mobile Navigation"
+    >
+      <a href="#band" class="nav-link block py-3 text-base">Band</a>
+      <a href="#termine" class="nav-link block py-3 text-base">Termine</a>
+      <a href="#reviews" class="nav-link block py-3 text-base">Stimmen</a>
+      <a href="#galerie" class="nav-link block py-3 text-base">Galerie</a>
+      <a href="#media" class="nav-link block py-3 text-base">Musik</a>
+      <button
+        type="button"
+        data-open-booking
+        class="btn-primary text-sm px-5 py-3 rounded-sm mt-2 w-full"
+      >
+        Jetzt buchen
+      </button>
+      <a href="admin.html" class="nav-link flex items-center gap-1.5 py-3 text-sm text-paper-dim">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 0 1 6 0v3H9zm3 4a2 2 0 0 1 1 3.73V19a1 1 0 1 1-2 0v-1.27A2 2 0 0 1 12 14z"/></svg>
+        Admin-Login
+      </a>
+    </nav>
+  </header>
+
+  <main id="main-content">
+    <!-- ==========================================================================
+         HERO
+         ========================================================================== -->
+    <section id="top" class="hero-beam min-h-[92svh] sm:min-h-[88svh] flex items-end pt-32 pb-14 px-5 sm:px-8 relative overflow-hidden">
+      <!-- HERO-HINTERGRUNDBILD:
+           Aktuell eingesetzt: das Bandshooting-Foto vor der alten Fabrikhalle
+           mit Hot Rod (assets/img/hero/hero-bg.jpg). Ein abgedunkelter
+           Verlauf in den Marken-Farben (Tinten-Schwarz -> Siegel-Rot/Gold,
+           siehe .hero-beam in style.css) liegt darüber, damit der Text
+           jederzeit lesbar bleibt. Anderes Bild nutzen: Datei unter
+           demselben Pfad ersetzen, oder den src-Pfad unten anpassen. -->
+      <img
+        src="assets/img/hero/hero-bg.jpg"
+        alt=""
+        aria-hidden="true"
+        class="absolute inset-0 w-full h-full object-cover object-[center_18%] z-0"
+      />
+      <div class="hero-overlay absolute inset-0 z-[1]"></div>
+
+      <!-- LOGO-WASSERZEICHEN:
+           Freigestellte Version des Logos (assets/img/logo-watermark.png —
+           nur die Tinten-Zeichnung, transparenter Hintergrund statt des
+           gealterten Papiers) liegt groß und halbtransparent oben rechts
+           über dem Hintergrundfoto, wie ein Bühnen-Stempel. Größe über
+           w-*, Deckkraft über die Klasse opacity-* steuern; neues Logo
+           einsetzen: Datei unter demselben Pfad ersetzen. -->
+      <img
+        src="assets/img/logo-watermark.png"
+        alt=""
+        aria-hidden="true"
+        class="hidden sm:block absolute top-32 lg:top-36 right-4 lg:right-8 w-[45%] sm:w-[40%] lg:w-[32%] max-w-md opacity-40 z-[2] pointer-events-none select-none"
+      />
+
+      <div class="relative z-10 max-w-6xl mx-auto w-full">
+        <p class="hero-in font-display text-gold text-sm sm:text-base mb-4 tracking-wide">
+          Rock · Blues · Country — sechs Musiker, eine Bühne
+        </p>
+        <h1 class="hero-in delay-1 hero-title font-display text-[13vw] sm:text-[8vw] lg:text-[6.5rem] mb-6">
+          Who Knows?
+        </h1>
+        <p class="hero-in delay-2 max-w-xl text-lg sm:text-xl text-paper-dim mb-10">
+          Niemand weiß, welcher Song als Nächstes kommt — aber jeder weiß, dass die
+          Bühne danach nicht mehr dieselbe ist. Who Knows? aus Brandoberndorf bringt
+          Rock, Blues und Country mit Wucht auf jede Bühne.
+        </p>
+        <div class="hero-in delay-3 flex flex-wrap gap-4">
+          <button type="button" data-open-booking class="btn-primary px-7 py-3.5 rounded-sm text-base">
+            Jetzt buchen
+          </button>
+          <a href="#media" class="btn-ghost px-7 py-3.5 rounded-sm text-base inline-block">
+            Reinhören
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         BAND-SEKTION — 6 Mitglieder
+         ========================================================================== -->
+    <section id="band" class="px-5 sm:px-8 py-14 sm:py-20">
+      <div class="max-w-6xl mx-auto">
+        <div class="reveal mb-8 max-w-2xl">
+          <h2 class="font-display text-4xl sm:text-5xl mb-4">Die Band</h2>
+          <p class="text-paper-dim text-lg">
+            Sechs Persönlichkeiten, ein Sound. Jede Show lebt vom Zusammenspiel —
+            hier sind die Köpfe dahinter.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- Mitglied 1 -->
+          <article class="member-card reveal rounded-md p-6">
+            <!-- Echtes Foto eingebunden. Neues Foto? Datei unter
+                 assets/img/band/raffa.jpg ersetzen — object-contain sorgt
+                 dafür, dass die Person immer komplett sichtbar bleibt
+                 (kein Zuschneiden), auch wenn das neue Foto ein anderes
+                 Seitenverhältnis hat. -->
+            <div class="member-photo w-full aspect-[4/5] rounded-md mb-5 overflow-hidden flex items-center justify-center">
+              <img src="assets/img/band/raffa.jpg" alt="Porträt von Raffa" class="w-full h-full object-contain" />
+            </div>
+            <span class="role-tag text-xs px-3 py-1 rounded-sm mb-3">Gesang</span>
+            <h3 class="font-display text-2xl mb-2">Raffa</h3>
+            <p class="text-paper-dim text-sm leading-relaxed">
+              Raffa steht vorne am Mikro und gibt der Band ihr Gesicht —
+              druckvolle Stimme, direkter Kontakt zum Publikum, keine Show
+              ohne diese Energie.
+            </p>
+          </article>
+
+          <!-- Mitglied 2 -->
+          <article class="member-card reveal rounded-md p-6">
+            <!-- PORTRÄT-PLATZHALTER: ersetzt durch
+                 <img src="assets/img/band/marie.jpg" alt="Porträt von Marie" class="w-full h-full object-contain" />
+                 sobald ein echtes Foto vorliegt. -->
+            <div class="member-photo w-full aspect-[4/5] rounded-md mb-5 flex items-center justify-center text-paper-dim font-display text-3xl">
+              MA
+            </div>
+            <span class="role-tag text-xs px-3 py-1 rounded-sm mb-3">Gesang / Akustikgitarre</span>
+            <h3 class="font-display text-2xl mb-2">Marie</h3>
+            <p class="text-paper-dim text-sm leading-relaxed">
+              Marie verbindet Gesang und Akustikgitarre zu den intensiven
+              Zwischentönen im Set — dort, wo der Rock kurz Platz zum
+              Atmen lässt.
+            </p>
+          </article>
+
+          <!-- Mitglied 3 -->
+          <article class="member-card reveal rounded-md p-6">
+            <div class="member-photo w-full aspect-[4/5] rounded-md mb-5 overflow-hidden flex items-center justify-center">
+              <img src="assets/img/band/tim.jpg" alt="Porträt von Tim" class="w-full h-full object-contain" />
+            </div>
+            <span class="role-tag text-xs px-3 py-1 rounded-sm mb-3">Lead-Gitarre</span>
+            <h3 class="font-display text-2xl mb-2">Tim</h3>
+            <p class="text-paper-dim text-sm leading-relaxed">
+              Tim liefert die Leadgitarre: markante Riffs, druckvolle Soli
+              und der Sound, der noch lange nach dem letzten Ton im Ohr
+              bleibt.
+            </p>
+          </article>
+
+          <!-- Mitglied 4 -->
+          <article class="member-card reveal rounded-md p-6">
+            <div class="member-photo w-full aspect-[4/5] rounded-md mb-5 overflow-hidden flex items-center justify-center">
+              <img src="assets/img/band/tobi.jpg" alt="Porträt von Tobi" class="w-full h-full object-contain" />
+            </div>
+            <span class="role-tag text-xs px-3 py-1 rounded-sm mb-3">Rhythmus-Gitarre</span>
+            <h3 class="font-display text-2xl mb-2">Tobi</h3>
+            <p class="text-paper-dim text-sm leading-relaxed">
+              Tobi hält als Rhythmusgitarrist alles zusammen — der feste
+              Rahmen, in dem sich Leadgitarre und Gesang frei entfalten
+              können.
+            </p>
+          </article>
+
+          <!-- Mitglied 5 -->
+          <article class="member-card reveal rounded-md p-6">
+            <div class="member-photo w-full aspect-[4/5] rounded-md mb-5 overflow-hidden flex items-center justify-center">
+              <img src="assets/img/band/nik.jpg" alt="Porträt von Nik" class="w-full h-full object-contain" />
+            </div>
+            <span class="role-tag text-xs px-3 py-1 rounded-sm mb-3">Schlagzeug</span>
+            <h3 class="font-display text-2xl mb-2">Nik</h3>
+            <p class="text-paper-dim text-sm leading-relaxed">
+              Nik sitzt hinterm Schlagzeug und gibt den Takt vor, druckvoll
+              und präzise — das Herzstück, das die ganze Band
+              zusammenhält.
+            </p>
+          </article>
+
+          <!-- Mitglied 6 -->
+          <article class="member-card reveal rounded-md p-6">
+            <div class="member-photo w-full aspect-[4/5] rounded-md mb-5 overflow-hidden flex items-center justify-center">
+              <img src="assets/img/band/uli.jpg" alt="Porträt von Uli" class="w-full h-full object-contain" />
+            </div>
+            <span class="role-tag text-xs px-3 py-1 rounded-sm mb-3">Bass</span>
+            <h3 class="font-display text-2xl mb-2">Uli</h3>
+            <p class="text-paper-dim text-sm leading-relaxed">
+              Uli legt am Bass das Fundament, auf dem der ganze Sound
+              steht — satt, groovend und genau dort, wo er hingehört.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         TERMINE — kommende & vergangene Auftritte
+         --------------------------------------------------------------------------
+         Der Inhalt wird komplett aus dem "shows"-Array in assets/js/main.js
+         (Abschnitt "TERMINE") erzeugt — sowohl diese Liste als auch der
+         Hinweis-Streifen ganz oben im Header. Neuen Termin ergänzen: einfach
+         einen Eintrag im "shows"-Array hinzufügen, siehe Kommentar dort.
+         ========================================================================== -->
+    <section id="termine" class="px-5 sm:px-8 py-14 sm:py-20">
+      <div class="max-w-4xl mx-auto">
+        <div class="reveal mb-8 max-w-2xl">
+          <h2 class="font-display text-4xl sm:text-5xl mb-4">Termine</h2>
+          <p class="text-paper-dim text-lg">
+            Kommende Auftritte — und ein Rückblick auf Shows, die schon
+            gespielt wurden.
+          </p>
+        </div>
+
+        <div class="reveal mb-10">
+          <h3 class="font-display text-xl text-gold mb-4">Kommende Auftritte</h3>
+          <ul id="upcoming-shows-list" class="space-y-3"></ul>
+        </div>
+
+        <div class="reveal">
+          <h3 class="font-display text-xl text-paper-dim mb-4">Vergangene Auftritte</h3>
+          <ul id="past-shows-list" class="space-y-3"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         SCHON AUFGETRETEN BEI — Logos von Locations/Festivals (Platzhalter)
+         ========================================================================== -->
+    <section class="px-5 sm:px-8 py-10 bg-ink-2">
+      <div class="max-w-4xl mx-auto reveal">
+        <p class="text-center text-sm text-paper-dim mb-6">Schon aufgetreten bei</p>
+        <div class="logo-strip flex flex-wrap items-center justify-center gap-8">
+          <!-- LOGO-PLATZHALTER: jeweils durch <img src="assets/img/logos/xyz.png" alt="Name" class="h-10" />
+               ersetzen, sobald echte Location-/Festival-Logos vorliegen. -->
+          <div class="logo-placeholder h-12 w-32 rounded-sm text-xs">Stadtfest Lindenau</div>
+          <div class="logo-placeholder h-12 w-32 rounded-sm text-xs">Festhalle Dahl</div>
+          <div class="logo-placeholder h-12 w-32 rounded-sm text-xs">Open-Air am Fluss</div>
+          <div class="logo-placeholder h-12 w-32 rounded-sm text-xs">Backstage Club</div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ==========================================================================
+         BILDERGALERIE — Fotos von der Band & von Auftritten
+         --------------------------------------------------------------------------
+         NEUE BILDER HINZUFÜGEN:
+         1. Bilddatei unter assets/img/gallery/ ablegen (z. B. auftritt-05.jpg).
+         2. Weiteren <button class="gallery-item" ...> Block nach demselben
+            Muster wie unten ergänzen (data-img = Pfad zum Bild,
+            data-caption = Bildunterschrift). Die Lightbox findet neue
+            Kacheln automatisch, ohne dass ihr JavaScript anfassen müsst.
+         Für Kacheln, deren Bilddatei noch fehlt, zeigt die Seite automatisch
+         ein Kamera-Symbol als Platzhalter (siehe letzte beide Kacheln unten).
+         ========================================================================== -->
+    <section id="galerie" class="px-5 sm:px-8 py-14 sm:py-20">
+      <div class="max-w-6xl mx-auto">
+        <div class="reveal mb-8 max-w-2xl">
+          <h2 class="font-display text-4xl sm:text-5xl mb-4">Galerie</h2>
+          <p class="text-paper-dim text-lg">
+            Impressionen von Proben, Auftritten und Festivals — ein Blick hinter
+            und auf die Bühne.
+          </p>
+        </div>
+
+        <div class="reveal grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 auto-rows-[130px] sm:auto-rows-[170px] lg:auto-rows-[190px]">
+          <button type="button" class="gallery-item row-span-2 rounded-md overflow-hidden relative group" data-img="assets/img/gallery/buehne-solo.jpg" data-caption="Voller Einsatz auf der Rock & Roll Rd — Live on stage">
+            <img src="assets/img/gallery/buehne-solo.jpg" alt="Sänger auf der Bühne mit lila Bühnenlicht" loading="lazy" />
+          </button>
+
+          <button type="button" class="gallery-item sm:col-span-2 rounded-md overflow-hidden relative group" data-img="assets/img/gallery/buehne-band.jpg" data-caption="Die ganze Band live im Set">
+            <img src="assets/img/gallery/buehne-band.jpg" alt="Die Band live auf der Bühne mit blauem Bühnenlicht" loading="lazy" />
+          </button>
+
+          <button type="button" class="gallery-item rounded-md overflow-hidden relative group" data-img="assets/img/gallery/promo-artwork.jpg" data-caption="Who Knows? — Bandshooting">
+            <img src="assets/img/gallery/promo-artwork.jpg" alt="Bandshooting-Artwork von Who Knows?" loading="lazy" />
+          </button>
+
+          <button type="button" class="gallery-item sm:col-span-2 rounded-md overflow-hidden relative group" data-img="assets/img/gallery/bandfoto-probe.jpg" data-caption="Bandfoto im Proberaum">
+            <img src="assets/img/gallery/bandfoto-probe.jpg" alt="Gruppenfoto der Band mit Gitarren im Proberaum" loading="lazy" />
+          </button>
+
+          <button type="button" class="gallery-item rounded-md overflow-hidden relative group" data-img="assets/img/gallery/auftritt-05.jpg" data-caption="Nächster Auftritt folgt hier">
+            <div class="gallery-placeholder w-full h-full flex flex-col items-center justify-center gap-2">
+              <svg class="w-6 h-6 opacity-60" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 3l-1.83 2H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.17L15 3H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+              <span class="text-xs text-paper-dim px-2 text-center">Foto folgt</span>
+            </div>
+          </button>
+
+          <button type="button" class="gallery-item rounded-md overflow-hidden relative group" data-img="assets/img/gallery/auftritt-06.jpg" data-caption="Nächster Auftritt folgt hier">
+            <div class="gallery-placeholder w-full h-full flex flex-col items-center justify-center gap-2">
+              <svg class="w-6 h-6 opacity-60" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 3l-1.83 2H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.17L15 3H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+              <span class="text-xs text-paper-dim px-2 text-center">Foto folgt</span>
+            </div>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         MEDIA-BEREICH MIT AUDIO-PLAYER
+         --------------------------------------------------------------------------
+         Zweispaltiges, kompaktes Layout: Text links, kleiner Player rechts
+         daneben (auf Mobilgeräten stapelt es sich automatisch). Für einen
+         noch schlankeren Player einfach die Höhen/Paddings unten (p-3, p-4,
+         w-11 h-11 etc.) weiter reduzieren.
+         ========================================================================== -->
+    <section id="media" class="px-5 sm:px-8 py-14 sm:py-20">
+      <div class="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_26rem] gap-8 lg:gap-10 items-start">
+        <div class="reveal">
+          <h2 class="font-display text-4xl sm:text-5xl mb-4">Reinhören</h2>
+          <p class="text-paper-dim text-lg mb-4">
+            Eine kleine Auswahl unserer Songs.
+          </p>
+        </div>
+
+        <div class="player-panel player-panel--compact reveal rounded-md overflow-hidden w-full lg:max-w-md">
+          <!-- Aktueller Track + Steuerung -->
+          <div class="p-3 flex items-center gap-3 border-b border-white/10">
+            <button
+              id="play-btn"
+              type="button"
+              class="play-btn shrink-0 w-10 h-10 rounded-full bg-rust flex items-center justify-center"
+              aria-label="Abspielen"
+            >
+              <!-- Play-Icon -->
+              <svg id="play-icon" class="w-4 h-4 ml-0.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              <!-- Pause-Icon (standardmäßig versteckt) -->
+              <svg id="pause-icon" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M6 5h4v14H6zM14 5h4v14h-4z" />
+              </svg>
+            </button>
+
+            <div class="min-w-0 flex-1">
+              <p class="text-[10px] text-paper-dim uppercase tracking-wide mb-0.5">Läuft gerade</p>
+              <p id="now-playing-title" class="font-display text-sm truncate">Track auswählen</p>
+            </div>
+
+            <div class="flex items-center gap-1">
+              <button id="prev-track" type="button" class="btn-ghost w-7 h-7 rounded-sm flex items-center justify-center" aria-label="Vorheriger Track">
+                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+              </button>
+              <button id="next-track" type="button" class="btn-ghost w-7 h-7 rounded-sm flex items-center justify-center" aria-label="Nächster Track">
+                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 6h2v12h-2zM6 6l8.5 6L6 18z"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Fortschrittsbalken -->
+          <div class="px-3 py-2.5 flex items-center gap-2 border-b border-white/10">
+            <span id="current-time" class="text-[10px] text-paper-dim w-8 tabular-nums">0:00</span>
+            <input
+              id="progress-bar"
+              type="range"
+              min="0"
+              value="0"
+              class="w-full h-1 rounded-full bg-white/10 cursor-pointer"
+              aria-label="Wiedergabefortschritt"
+            />
+            <!-- Zeigt die verbleibende Spielzeit (zählt beim Abspielen
+                 rückwärts, siehe timeupdate-Handler in main.js) -->
+            <span id="total-time" class="text-[10px] text-paper-dim w-10 tabular-nums text-right">-0:00</span>
+          </div>
+
+          <!-- Lautstärke -->
+          <div class="px-3 py-2.5 flex items-center gap-2 border-b border-white/10">
+            <button
+              id="mute-btn"
+              type="button"
+              class="shrink-0 w-6 h-6 flex items-center justify-center text-paper-dim hover:text-paper transition-colors"
+              aria-label="Stummschalten"
+            >
+              <!-- Lautsprecher-Icon (Ton an) -->
+              <svg id="volume-icon" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M4 9v6h4l5 5V4L8 9H4zm11.5 3a4.5 4.5 0 0 0-2.5-4.03v8.06A4.5 4.5 0 0 0 15.5 12z" />
+              </svg>
+              <!-- Lautsprecher-Icon (stumm, standardmäßig versteckt) -->
+              <svg id="mute-icon" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M4 9v6h4l5 5V4L8 9H4zm13.54 3 2.46-2.46-1.41-1.41L16.13 10.6l-2.46-2.47-1.41 1.41L14.72 12l-2.46 2.46 1.41 1.41 2.46-2.46 2.46 2.46 1.41-1.41L17.54 12z" />
+              </svg>
+            </button>
+            <input
+              id="volume-bar"
+              type="range"
+              min="0"
+              max="100"
+              value="80"
+              class="w-full h-1 rounded-full bg-white/10 cursor-pointer"
+              aria-label="Lautstärke"
+            />
+          </div>
+
+          <!-- Playlist: einfache, immer sichtbare vertikale Liste mit
+               eigenem Scrollbalken (von oben nach unten scrollen), siehe
+               .track-list in style.css für die max-height/Scrollbar. -->
+          <ul id="track-list" class="track-list divide-y divide-white/10 overflow-y-auto" aria-label="Playliste"></ul>
+
+          <!-- Das eigentliche Audio-Element bleibt unsichtbar; die Bedienung
+               läuft komplett über die eigenen Buttons oben (siehe main.js). -->
+          <audio id="audio-element" preload="metadata"></audio>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         REVIEWS / SOCIAL PROOF
+         ========================================================================== -->
+    <section id="reviews" class="px-5 sm:px-8 py-14 sm:py-20 bg-ink-2">
+      <div class="max-w-6xl mx-auto">
+        <div class="reveal mb-8 max-w-2xl">
+          <h2 class="font-display text-4xl sm:text-5xl mb-4">Was Veranstalter sagen</h2>
+          <p class="text-paper-dim text-lg">
+            Ob Firmenfeier, Clubshow oder Festivalbühne — das sagen die Menschen,
+            die uns gebucht haben.
+          </p>
+        </div>
+
+        <!-- ======================================================================
+             BEWERTUNGEN — scrollbares Grid
+             ----------------------------------------------------------------------
+             Zeigt auf den ersten Blick eine Reihe (4 auf Desktop) Bewertungen;
+             durch Scrollen innerhalb des Kastens werden weitere Reihen
+             sichtbar. Alle live über das Formular freigegebenen Bewertungen
+             (siehe loadApprovedReviews() in main.js) werden vorne in
+             dasselbe Grid eingefügt.
+             ====================================================================== -->
+        <!-- ======================================================================
+             BEWERTUNGEN — scrollbares Grid
+             ----------------------------------------------------------------------
+             Komplett dynamisch: der Inhalt kommt ausschließlich aus
+             Firestore über loadApprovedReviews() in main.js. Sobald jemand
+             das Formular unten ausfüllt und ihr die Bewertung im
+             Admin-Bereich (admin.html) freigebt, erscheint sie hier
+             automatisch — kein manuelles HTML-Bearbeiten nötig. Ist noch
+             keine einzige Bewertung freigegeben, zeigt main.js stattdessen
+             den Hinweis "Aktuell sind noch keine Bewertungen vorhanden."
+             ====================================================================== -->
+        <div id="review-scroll" class="review-scroll reveal grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-h-[26rem] overflow-y-auto pr-1 mb-10"></div>
+
+        <!-- ======================================================================
+             EIGENE BEWERTUNG SCHREIBEN
+             ----------------------------------------------------------------------
+             Öffentliches Formular: Jeder Besucher kann eine Bewertung abgeben.
+             Damit keine Spam-/Fake-Bewertungen sofort live gehen, landen neue
+             Einträge zunächst als "wartet auf Freigabe" in Firestore und
+             erscheinen erst auf der Seite, nachdem ihr sie im Admin-Bereich
+             (admin.html) freigegeben habt. Ohne Firebase-Konfiguration (siehe
+             assets/js/firebase-config.js) ist das Formular inaktiv und zeigt
+             einen entsprechenden Hinweis.
+             ====================================================================== -->
+        <div class="reveal max-w-2xl mx-auto text-center">
+          <h3 class="font-display text-2xl sm:text-3xl mb-3">Selbst schon dabei gewesen?</h3>
+          <p class="text-paper-dim mb-8">
+            Schreibt uns eure Erfahrung — nach kurzer Prüfung erscheint eure
+            Bewertung hier auf der Seite.
+          </p>
+        </div>
+
+        <form id="review-form" class="reveal max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-5" novalidate>
+          <div id="firebase-disabled-notice" class="hidden sm:col-span-2 text-sm text-paper-dim bg-charcoal border border-white/10 rounded-md px-4 py-3">
+            Das Bewertungsformular ist aktuell nicht verbunden — sobald Firebase
+            eingerichtet ist (siehe README), können Besucher hier live
+            Bewertungen abgeben.
+          </div>
+
+          <div class="form-field sm:col-span-1">
+            <label for="review-name" class="block text-sm mb-2">Name *</label>
+            <input id="review-name" name="name" type="text" required class="w-full rounded-sm px-4 py-3 text-sm" />
+            <p class="error-message text-xs mt-1.5">Bitte gebt euren Namen ein.</p>
+          </div>
+
+          <div class="form-field sm:col-span-1">
+            <label for="review-event" class="block text-sm mb-2">Veranstaltung / Location</label>
+            <input id="review-event" name="eventName" type="text" placeholder="z. B. Stadtfest Lindenau" class="w-full rounded-sm px-4 py-3 text-sm" />
+          </div>
+
+          <div class="form-field sm:col-span-2">
+            <span class="block text-sm mb-2">Bewertung *</span>
+            <div class="star-rating flex items-center gap-1" role="radiogroup" aria-label="Sternebewertung von 1 bis 5">
+              <input type="radio" name="rating" id="rating-5" value="5" required />
+              <label for="rating-5" title="5 Sterne">★</label>
+              <input type="radio" name="rating" id="rating-4" value="4" />
+              <label for="rating-4" title="4 Sterne">★</label>
+              <input type="radio" name="rating" id="rating-3" value="3" />
+              <label for="rating-3" title="3 Sterne">★</label>
+              <input type="radio" name="rating" id="rating-2" value="2" />
+              <label for="rating-2" title="2 Sterne">★</label>
+              <input type="radio" name="rating" id="rating-1" value="1" />
+              <label for="rating-1" title="1 Stern">★</label>
+            </div>
+            <p class="error-message text-xs mt-1.5">Bitte wählt eine Sternebewertung.</p>
+          </div>
+
+          <div class="form-field sm:col-span-2">
+            <label for="review-comment" class="block text-sm mb-2">Kommentar *</label>
+            <textarea id="review-comment" name="comment" rows="4" required class="w-full rounded-sm px-4 py-3 text-sm"></textarea>
+            <p class="error-message text-xs mt-1.5">Bitte hinterlasst einen kurzen Kommentar.</p>
+          </div>
+
+          <!-- HONEYPOT gegen einfache Spam-Bots:
+               Für echte Besucher unsichtbar (per CSS außerhalb des
+               sichtbaren Bereichs positioniert, siehe .honeypot-field in
+               style.css) und aus der Tastatur-/Screenreader-Navigation
+               ausgeschlossen. Bots, die blind alle Formularfelder
+               ausfüllen, tappen hier hinein — wird das Feld befüllt,
+               verwirft main.js die Einsendung still (siehe initReviewForm). -->
+          <div class="honeypot-field" aria-hidden="true">
+            <label for="review-website">Website (bitte leer lassen)</label>
+            <input type="text" id="review-website" name="website" tabindex="-1" autocomplete="off" />
+          </div>
+
+          <div class="form-field sm:col-span-2">
+            <label for="review-robot-check" class="robot-check-wrapper">
+              <input type="checkbox" id="review-robot-check" name="robot_check" required />
+              <span>Ich bin kein Roboter</span>
+            </label>
+            <p class="error-message text-xs mt-1.5">Bitte bestätigt, dass ihr kein Roboter seid.</p>
+          </div>
+
+          <div class="sm:col-span-2">
+            <button type="submit" class="btn-primary w-full sm:w-auto px-8 py-3.5 rounded-sm text-base">
+              Bewertung absenden
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         BUCHEN — abschließender Call-to-Action
+         --------------------------------------------------------------------------
+         Ersetzt den früheren separaten Kontaktbereich: die Buchungsanfrage
+         läuft komplett über das Buchungs-Modal (Button oben in der
+         Navigation + hier).
+         ========================================================================== -->
+    <section class="px-5 sm:px-8 py-16 sm:py-24 bg-ink-2">
+      <div class="max-w-2xl mx-auto text-center reveal">
+        <h2 class="font-display text-3xl sm:text-4xl mb-4">Bereit für eure Veranstaltung?</h2>
+        <p class="text-paper-dim text-lg mb-8">
+          Ob Firmenfeier, Hochzeit oder Festivalbühne — schickt uns eure
+          Anfrage, wir melden uns schnellstmöglich zurück.
+        </p>
+        <button type="button" data-open-booking class="btn-primary px-8 py-3.5 rounded-sm text-base">
+          Jetzt buchen
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==========================================================================
+       FOOTER
+       ========================================================================== -->
+  <footer class="px-5 sm:px-8 py-10 border-t border-white/10">
+    <div class="max-w-6xl mx-auto flex flex-col items-center gap-3 text-center text-sm text-paper-dim">
+      <p>© <span id="current-year"></span> Who Knows? Alle Rechte vorbehalten.</p>
+      <!-- RECHTLICHES: öffnet jeweils dasselbe Modal (#legal-modal) mit
+           passendem Inhalt aus LEGAL_CONTENT in main.js. Texte dort
+           anpassen — siehe Kommentar in main.js und README, Abschnitt
+           "Rechtliche Seiten anpassen". -->
+      <nav aria-label="Rechtliches" class="flex items-center gap-4">
+        <button type="button" data-legal="impressum" class="hover:text-paper underline underline-offset-2 transition-colors">Impressum</button>
+        <span aria-hidden="true" class="opacity-40">·</span>
+        <button type="button" data-legal="datenschutz" class="hover:text-paper underline underline-offset-2 transition-colors">Datenschutzerklärung</button>
+        <span aria-hidden="true" class="opacity-40">·</span>
+        <button type="button" data-legal="agb" class="hover:text-paper underline underline-offset-2 transition-colors">AGB</button>
+      </nav>
+    </div>
+  </footer>
+
+  <!-- ==========================================================================
+       RECHTLICHES-MODAL (Impressum / Datenschutz / AGB)
+       ========================================================================== -->
+  <div
+    id="legal-modal"
+    class="modal-backdrop hidden fixed inset-0 z-50 flex items-center justify-center p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="legal-modal-title"
+  >
+    <div class="modal-panel rounded-md w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6 sm:p-8">
+      <div class="flex items-start justify-between gap-4 mb-6">
+        <h2 id="legal-modal-title" class="font-display text-2xl sm:text-3xl"></h2>
+        <button type="button" data-close-legal class="text-paper-dim hover:text-paper text-2xl leading-none px-2 shrink-0" aria-label="Schließen">
+          &times;
+        </button>
+      </div>
+      <div id="legal-modal-body" class="legal-content text-sm text-paper-dim leading-relaxed"></div>
+    </div>
+  </div>
+
+  <!-- Schwebender "Buchen"-Button (auf Mobilgeräten immer sichtbar) -->
+  <button
+    type="button"
+    data-open-booking
+    class="btn-primary btn-float md:hidden fixed bottom-5 right-5 z-30 px-6 py-3.5 rounded-full text-sm"
+  >
+    Buchen
+  </button>
+
+  <!-- "Nach oben"-Button: links unten fest auf dem Bildschirm, durchgehend
+       sichtbar (nicht nur mobil) und bleibt beim Scrollen immer an
+       derselben Stelle stehen. Klick scrollt sanft zurück zum Seitenanfang
+       (siehe initScrollToTop() in main.js). -->
+  <button
+    type="button"
+    id="scroll-top-btn"
+    class="scroll-top-btn fixed bottom-5 left-5 z-30 w-12 h-12 rounded-full flex items-center justify-center"
+    aria-label="Nach oben scrollen"
+  >
+    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 5l7 7-1.41 1.41L13 8.83V19h-2V8.83l-4.59 4.58L5 12z" />
+    </svg>
+  </button>
+
+  <!-- ==========================================================================
+       BUCHUNGS-MODAL
+       ========================================================================== -->
+  <div
+    id="booking-modal"
+    class="modal-backdrop hidden fixed inset-0 z-50 flex items-center justify-center p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="booking-modal-title"
+  >
+    <div class="modal-panel reveal in-view rounded-md w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 sm:p-8">
+      <div class="flex items-start justify-between mb-6">
+        <div>
+          <h2 id="booking-modal-title" class="font-display text-3xl mb-1">Buchungsanfrage</h2>
+          <p class="text-paper-dim text-sm">Je mehr Details, desto schneller können wir euch ein Angebot machen.</p>
+        </div>
+        <button type="button" data-close-booking class="text-paper-dim hover:text-paper text-2xl leading-none px-2" aria-label="Modal schließen">
+          &times;
+        </button>
+      </div>
+
+      <form id="booking-form" class="grid grid-cols-1 sm:grid-cols-2 gap-5" novalidate>
+        <div class="form-field sm:col-span-1">
+          <label for="booking-name" class="block text-sm mb-2">Name des Veranstalters *</label>
+          <input id="booking-name" name="from_name" type="text" required class="w-full rounded-sm px-4 py-3 text-sm" />
+          <p class="error-message text-xs mt-1.5">Bitte gebt einen Namen ein.</p>
+        </div>
+
+        <div class="form-field sm:col-span-1">
+          <label for="booking-company" class="block text-sm mb-2">Firma (optional)</label>
+          <input id="booking-company" name="company" type="text" class="w-full rounded-sm px-4 py-3 text-sm" />
+        </div>
+
+        <div class="form-field sm:col-span-1">
+          <label for="booking-email" class="block text-sm mb-2">E-Mail *</label>
+          <input id="booking-email" name="from_email" type="email" required class="w-full rounded-sm px-4 py-3 text-sm" />
+          <p class="error-message text-xs mt-1.5">Bitte gebt eine gültige E-Mail-Adresse ein.</p>
+        </div>
+
+        <div class="form-field sm:col-span-1">
+          <label for="booking-phone" class="block text-sm mb-2">Telefonnummer *</label>
+          <input id="booking-phone" name="phone" type="tel" required class="w-full rounded-sm px-4 py-3 text-sm" />
+          <p class="error-message text-xs mt-1.5">Bitte gebt eine Telefonnummer ein.</p>
+        </div>
+
+        <div class="form-field sm:col-span-1">
+          <label for="booking-date" class="block text-sm mb-2">Veranstaltungsdatum *</label>
+          <input id="booking-date" name="event_date" type="date" required class="w-full rounded-sm px-4 py-3 text-sm" />
+          <p class="error-message text-xs mt-1.5">Bitte wählt ein Datum aus.</p>
+        </div>
+
+        <div class="form-field sm:col-span-1">
+          <label for="booking-type" class="block text-sm mb-2">Art der Veranstaltung</label>
+          <select id="booking-type" name="event_type" class="w-full rounded-sm px-4 py-3 text-sm">
+            <option value="">Bitte wählen</option>
+            <option value="Firmenfeier">Firmenfeier</option>
+            <option value="Hochzeit">Hochzeit</option>
+            <option value="Stadt-/Straßenfest">Stadt-/Straßenfest</option>
+            <option value="Festival">Festival</option>
+            <option value="Clubshow">Clubshow</option>
+            <option value="Sonstiges">Sonstiges</option>
+          </select>
+        </div>
+
+        <div class="form-field sm:col-span-2">
+          <label for="booking-location" class="block text-sm mb-2">Adresse / Location *</label>
+          <input id="booking-location" name="location" type="text" required class="w-full rounded-sm px-4 py-3 text-sm" />
+          <p class="error-message text-xs mt-1.5">Bitte gebt die Location oder Adresse an.</p>
+        </div>
+
+        <div class="form-field sm:col-span-1">
+          <label for="booking-guests" class="block text-sm mb-2">Erwartete Gästezahl</label>
+          <input id="booking-guests" name="guests" type="number" min="0" class="w-full rounded-sm px-4 py-3 text-sm" />
+        </div>
+
+        <div class="form-field sm:col-span-1">
+          <label for="booking-set-length" class="block text-sm mb-2">Wunsch-Setlänge / Spielzeiten</label>
+          <input id="booking-set-length" name="set_length" type="text" placeholder="z. B. 2x 45 Min., 20–22 Uhr" class="w-full rounded-sm px-4 py-3 text-sm" />
+        </div>
+
+        <div class="form-field sm:col-span-2">
+          <label for="booking-tech" class="block text-sm mb-2">Technische Ausstattung vor Ort</label>
+          <textarea id="booking-tech" name="tech_requirements" rows="3" placeholder="z. B. PA vorhanden, Bühne 6x4 m, Stromanschluss 16A …" class="w-full rounded-sm px-4 py-3 text-sm"></textarea>
+        </div>
+
+        <div class="form-field sm:col-span-2">
+          <label for="booking-budget" class="block text-sm mb-2">Preisvorstellung</label>
+          <input id="booking-budget" name="budget" type="text" placeholder="z. B. 1.500–2.000 €" class="w-full rounded-sm px-4 py-3 text-sm" />
+        </div>
+
+        <div class="form-field sm:col-span-2">
+          <label for="booking-message" class="block text-sm mb-2">Nachricht</label>
+          <textarea id="booking-message" name="message" rows="4" class="w-full rounded-sm px-4 py-3 text-sm"></textarea>
+        </div>
+
+        <div class="sm:col-span-2 flex flex-col sm:flex-row gap-3 mt-2">
+          <button type="submit" class="btn-primary flex-1 px-8 py-3.5 rounded-sm text-base">
+            Buchungsanfrage senden
+          </button>
+          <button type="button" data-close-booking class="btn-ghost px-8 py-3.5 rounded-sm text-base">
+            Abbrechen
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       GALERIE-LIGHTBOX
+       ========================================================================== -->
+  <div
+    id="gallery-lightbox"
+    class="modal-backdrop hidden fixed inset-0 z-50 flex items-center justify-center p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="lightbox-caption"
+  >
+    <div class="relative w-full max-w-4xl">
+      <button
+        type="button"
+        data-close-lightbox
+        class="absolute -top-12 right-0 sm:top-0 sm:-right-12 text-paper text-3xl leading-none w-10 h-10 flex items-center justify-center"
+        aria-label="Galerie schließen"
+      >
+        &times;
+      </button>
+
+      <div class="modal-panel rounded-md overflow-hidden">
+        <div class="relative bg-ink-2 flex items-center justify-center min-h-[50vh] max-h-[75vh]">
+          <img id="lightbox-image" src="" alt="" class="max-h-[75vh] w-auto max-w-full object-contain hidden" />
+          <div id="lightbox-fallback" class="lightbox-fallback flex flex-col items-center justify-center gap-3 p-10 text-center">
+            <svg class="w-10 h-10 opacity-50" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 3l-1.83 2H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.17L15 3H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+            <p class="text-sm text-paper-dim max-w-xs">
+              Foto noch nicht hinterlegt — sobald die Datei unter dem
+              angegebenen Pfad in <code class="text-gold">assets/img/gallery/</code>
+              liegt, erscheint sie hier automatisch.
+            </p>
+          </div>
+
+          <button type="button" data-prev-image class="absolute left-2 top-1/2 -translate-y-1/2 btn-ghost w-10 h-10 rounded-full flex items-center justify-center bg-ink/60" aria-label="Vorheriges Bild">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15 18l-6-6 6-6v12z"/></svg>
+          </button>
+          <button type="button" data-next-image class="absolute right-2 top-1/2 -translate-y-1/2 btn-ghost w-10 h-10 rounded-full flex items-center justify-center bg-ink/60" aria-label="Nächstes Bild">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 6l6 6-6 6V6z"/></svg>
+          </button>
+        </div>
+        <p id="lightbox-caption" class="px-5 py-4 text-sm text-paper-dim"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast für Erfolgs-/Fehlermeldungen nach Formular-Versand -->
+  <div id="toast" class="toast fixed bottom-5 left-5 right-5 sm:left-auto sm:right-5 sm:max-w-sm z-50 rounded-md px-5 py-4 text-sm" role="status" aria-live="polite"></div>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

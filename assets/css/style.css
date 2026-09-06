@@ -1,0 +1,1063 @@
+/* ==========================================================================
+   VOLTKREIS — Band-Website
+   Eigene Styles, die Tailwind (Utility-Klassen im HTML) ergänzen.
+   Enthält: Design-Tokens (CSS-Variablen), Typografie, Komponenten,
+   die sich schlecht als reine Utility-Klassen abbilden lassen, sowie
+   Animationen. Tailwind übernimmt Spacing/Grid/Responsive-Verhalten.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1) DESIGN-TOKENS
+   Hier zentral anpassen, wenn ihr Farben/Schriften der Band ändern wollt.
+   -------------------------------------------------------------------------- */
+:root {
+  /* Farben – abgeleitet vom Bandlogo: gealtertes Papier, Tinten-Schwarz,
+     Rost-/Siegel-Rot und gedämpftes Messing-Gold statt Neon-Bühnenlicht */
+  --color-ink: #14100c;        /* Tinten-Schwarz – Haupt-Hintergrund */
+  --color-ink-2: #1c1712;      /* etwas helleres Schwarz für Layer */
+  --color-charcoal: #241d16;   /* Karten-Hintergrund auf dunklem Grund */
+  --color-charcoal-2: #2c231a; /* Karten-Hintergrund, Variante */
+  --color-paper: #ece2cb;      /* gealtertes Papier für Text/helle Flächen */
+  --color-paper-dim: #c8bb9a;  /* gedämpftes Papier für Fließtext auf Dunkel */
+  --color-rust: #a8462b;       /* Siegel-Rot – Primärakzent / CTAs */
+  --color-rust-light: #c65f3f;
+  --color-gold: #c79a3e;       /* Messing-Gold – Sekundärakzent, Sterne */
+  --color-line: rgba(236, 226, 203, 0.12); /* dezente Trennlinien auf Dunkel */
+
+  /* Typografie */
+  --font-display: "Anton", "Arial Narrow", sans-serif; /* Plakat-Headlines */
+  --font-body: "Work Sans", "Segoe UI", sans-serif;     /* Fließtext/UI */
+
+  /* Sonstiges */
+  --radius-sm: 4px;
+  --radius-md: 10px;
+  --shadow-glow-rust: 0 0 60px rgba(168, 70, 43, 0.35);
+  --shadow-glow-gold: 0 0 50px rgba(199, 154, 62, 0.22);
+}
+
+/* --------------------------------------------------------------------------
+   2) GRUNDLAGEN
+   -------------------------------------------------------------------------- */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Sorgt dafür, dass Ankerlinks (Nav -> #band, #reviews, ...) nicht unter dem
+   fixierten Header verschwinden. */
+section[id] {
+  scroll-margin-top: 7.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body {
+  background-color: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+/* sichtbarer Fokus-Ring für Tastaturbedienung (Barrierefreiheit) */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--color-rust);
+  color: var(--color-paper);
+}
+
+/* --------------------------------------------------------------------------
+   3) HERO – diagonaler "Bühnenlicht"-Verlauf statt generischem Radial-Glow
+   -------------------------------------------------------------------------- */
+.hero-beam {
+  background-color: var(--color-ink);
+}
+
+/* Abdunklungs-/Marken-Verlauf über dem Hero-Hintergrundfoto: unten (wo der
+   Text steht) fast deckend im Tinten-Schwarz, nach oben hin heller und mit
+   einem Hauch Siegel-Rot/Gold, damit ein echtes Foto genutzt werden kann,
+   ohne dass Kontrast oder Farbstimmung leiden. */
+.hero-overlay {
+  background:
+    linear-gradient(0deg, var(--color-ink) 0%, rgba(20, 16, 12, 0.86) 38%, rgba(20, 16, 12, 0.35) 75%, rgba(20, 16, 12, 0.55) 100%),
+    radial-gradient(circle at 85% 15%, rgba(168, 70, 43, 0.35), transparent 55%),
+    radial-gradient(circle at 10% 85%, rgba(199, 154, 62, 0.18), transparent 50%);
+}
+
+.hero-title {
+  font-family: var(--font-display);
+  line-height: 0.88;
+  letter-spacing: 0.005em;
+}
+
+/* Logo-Platzhalter: sobald ihr euer Logo als Datei habt, ersetzt einfach
+   das <img>-src in index.html (siehe Kommentar dort). Dieser Rahmen
+   dient nur als visueller Platzhalter, solange kein Logo vorhanden ist. */
+.logo-placeholder {
+  border: 1.5px dashed var(--color-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-paper-dim);
+}
+
+/* --------------------------------------------------------------------------
+   4) NAVIGATION
+   -------------------------------------------------------------------------- */
+.site-nav {
+  background: rgba(14, 13, 16, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--color-line);
+}
+
+/* Nächster-Auftritt-Streifen ganz oben im Header (siehe initShows() in
+   main.js). Dezenter Verlauf in den Marken-Farben, damit er sich wie ein
+   Teil der Navigation anfühlt statt wie ein aufgesetztes Banner. */
+.next-show-bar {
+  background: linear-gradient(90deg, rgba(168, 70, 43, 0.35), rgba(199, 154, 62, 0.22));
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-paper);
+}
+.next-show-bar a {
+  color: inherit;
+}
+
+.nav-link {
+  position: relative;
+  color: var(--color-paper-dim);
+  transition: color 0.2s ease;
+}
+.nav-link:hover,
+.nav-link:focus-visible {
+  color: var(--color-paper);
+}
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  width: 0;
+  height: 2px;
+  background: var(--color-rust);
+  transition: width 0.25s ease;
+}
+.nav-link:hover::after,
+.nav-link:focus-visible::after {
+  width: 100%;
+}
+
+/* Burger-Icon Animation (drei Linien -> X) */
+.burger-line {
+  transition: transform 0.25s ease, opacity 0.2s ease;
+  transform-origin: center;
+}
+.burger-open .burger-line:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.burger-open .burger-line:nth-child(2) {
+  opacity: 0;
+}
+.burger-open .burger-line:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* --------------------------------------------------------------------------
+   5) BUTTONS
+   -------------------------------------------------------------------------- */
+.btn-primary {
+  background: var(--color-rust);
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.btn-primary:hover,
+.btn-primary:focus-visible {
+  background: var(--color-rust-light);
+  box-shadow: var(--shadow-glow-rust);
+  transform: translateY(-2px);
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-ghost {
+  border: 1.5px solid var(--color-line);
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.btn-ghost:hover,
+.btn-ghost:focus-visible {
+  border-color: var(--color-gold);
+  background: rgba(199, 154, 62, 0.08);
+}
+
+/* Schwebender Buchen-Button auf Mobilgeräten */
+.btn-float {
+  box-shadow: 0 8px 30px rgba(168, 70, 43, 0.45);
+}
+
+/* "Nach oben"-Button: dezentes, rundes Pendant zum Buchen-Button auf der
+   gegenüberliegenden Seite — bewusst zurückhaltender (kein knalliges
+   Rost-Rot), da es sich um eine Navigationshilfe und keine Handlungs-
+   aufforderung handelt. */
+.scroll-top-btn {
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+  color: var(--color-paper-dim);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.scroll-top-btn:hover,
+.scroll-top-btn:focus-visible {
+  color: var(--color-gold);
+  border-color: rgba(199, 154, 62, 0.45);
+  transform: translateY(-2px);
+}
+
+/* --------------------------------------------------------------------------
+   6) BAND-SEKTION
+   -------------------------------------------------------------------------- */
+.member-card {
+  background: linear-gradient(180deg, var(--color-charcoal) 0%, var(--color-charcoal-2) 100%);
+  border: 1px solid var(--color-line);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.member-card:hover {
+  border-color: rgba(199, 154, 62, 0.5);
+  transform: translateY(-4px);
+}
+
+/* Rollen-Tag – schräg gestellt, wie ein Aufnäher/Backstage-Pass statt
+   eines generischen Eyebrow-Labels */
+.role-tag {
+  display: inline-block;
+  transform: rotate(-2deg);
+  background: var(--color-rust);
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+.member-photo {
+  background: var(--color-ink-2);
+  border: 1px solid var(--color-line);
+}
+
+/* --------------------------------------------------------------------------
+   6b) TERMINE
+   -------------------------------------------------------------------------- */
+.show-row {
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+  transition: border-color 0.2s ease;
+}
+.show-row:hover {
+  border-color: rgba(199, 154, 62, 0.4);
+}
+.show-date {
+  color: var(--color-gold);
+  min-width: 9.5rem;
+}
+.show-type-badge {
+  background: rgba(199, 154, 62, 0.15);
+  color: var(--color-gold);
+  border: 1px solid rgba(199, 154, 62, 0.3);
+}
+
+/* Vergangene Auftritte etwas gedämpfter darstellen als kommende. */
+.show-row--past {
+  opacity: 0.65;
+}
+.show-row--past .show-date {
+  color: var(--color-paper-dim);
+}
+.show-row--past .show-type-badge {
+  background: rgba(236, 226, 203, 0.06);
+  color: var(--color-paper-dim);
+  border-color: var(--color-line);
+}
+
+/* --------------------------------------------------------------------------
+   7) REVIEWS
+   -------------------------------------------------------------------------- */
+.review-card {
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+  position: relative;
+}
+.review-card::before {
+  content: "\201E"; /* öffnendes deutsches Anführungszeichen */
+  font-family: var(--font-display);
+  font-size: 4rem;
+  line-height: 1;
+  color: rgba(168, 70, 43, 0.35);
+  position: absolute;
+  top: 0.25rem;
+  left: 0.75rem;
+}
+
+.stars {
+  color: var(--color-gold);
+  letter-spacing: 0.1em;
+}
+
+/* Scrollbarer Bereich für weitere Bewertungen (siehe #review-scroll in
+   index.html) — dieselbe dezente, farblich passende Scrollbar wie beim
+   Media-Player und der Galerie, statt der Standard-Browser-Leiste. */
+.review-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-rust) var(--color-ink-2);
+}
+.review-scroll::-webkit-scrollbar {
+  width: 7px;
+}
+.review-scroll::-webkit-scrollbar-track {
+  background: var(--color-ink-2);
+}
+.review-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-rust);
+  border-radius: 4px;
+}
+
+.logo-strip img,
+.logo-strip .logo-placeholder {
+  filter: grayscale(1);
+  opacity: 0.6;
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+.logo-strip img:hover,
+.logo-strip .logo-placeholder:hover {
+  opacity: 1;
+  filter: grayscale(0);
+}
+
+/* Sterne-Auswahl im Bewertungsformular: fünf Radio-Buttons, visuell als
+   Sterne dargestellt, in umgekehrter Reihenfolge im Markup (5 zuerst),
+   damit die CSS-Geschwister-Selektoren "alle Sterne bis zur Auswahl
+   hervorheben" ohne JavaScript funktionieren. */
+.star-rating {
+  direction: rtl;
+  justify-content: flex-end;
+}
+.star-rating input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.star-rating label {
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--color-line);
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+.star-rating input:checked ~ label,
+.star-rating label:hover,
+.star-rating label:hover ~ label {
+  color: var(--color-gold);
+}
+.star-rating input:focus-visible + label {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Bewertung "wartet auf Freigabe" — nur im Admin-Bereich sichtbar */
+.review-pending {
+  opacity: 0.7;
+}
+.review-pending::after {
+  content: "Wartet auf Freigabe";
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+}
+
+/* --------------------------------------------------------------------------
+   7b) BILDERGALERIE
+   -------------------------------------------------------------------------- */
+.gallery-item {
+  border: 1px solid var(--color-line);
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+.gallery-item:hover,
+.gallery-item:focus-visible {
+  border-color: rgba(199, 154, 62, 0.55);
+}
+.gallery-item:hover img {
+  transform: scale(1.04);
+}
+.gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.gallery-placeholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, var(--color-charcoal) 0%, var(--color-charcoal-2) 100%);
+  color: var(--color-paper-dim);
+}
+
+.lightbox-fallback {
+  color: var(--color-paper-dim);
+}
+
+/* --------------------------------------------------------------------------
+   8) AUDIO-PLAYER
+   -------------------------------------------------------------------------- */
+.player-panel {
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+}
+
+/* Playlist: normale vertikale Liste (siehe #track-list in index.html),
+   begrenzt auf eine feste Höhe mit eigenem, sichtbarem Scrollbalken in den
+   Marken-Farben — einfach von oben nach unten scrollen, um weitere Songs
+   zu sehen. */
+.track-list {
+  max-height: 14rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-rust) var(--color-ink-2);
+}
+.track-list::-webkit-scrollbar {
+  width: 7px;
+}
+.track-list::-webkit-scrollbar-track {
+  background: var(--color-ink-2);
+}
+.track-list::-webkit-scrollbar-thumb {
+  background: var(--color-rust);
+  border-radius: 4px;
+}
+
+.track-row {
+  border-bottom: 1px solid var(--color-line);
+  transition: background-color 0.15s ease;
+  cursor: pointer;
+}
+.track-row:last-child {
+  border-bottom: none;
+}
+.track-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.track-row[aria-current="true"] {
+  background: rgba(168, 70, 43, 0.14);
+}
+.track-row[aria-current="true"] .track-number {
+  color: var(--color-rust-light);
+}
+
+.track-number {
+  font-family: var(--font-display);
+  color: var(--color-paper-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Play/Pause-Button pulsiert dezent, während ein Track läuft */
+.play-btn.is-playing {
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(168, 70, 43, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 14px rgba(168, 70, 43, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(168, 70, 43, 0);
+  }
+}
+
+/* Fortschrittsbalken des Players */
+#progress-bar,
+#volume-bar {
+  accent-color: var(--color-rust);
+}
+
+/* --------------------------------------------------------------------------
+   9) FORMULARE (Kontakt + Buchungs-Modal)
+   -------------------------------------------------------------------------- */
+.form-field label {
+  color: var(--color-paper-dim);
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+  background: var(--color-ink-2);
+  border: 1px solid var(--color-line);
+  color: var(--color-paper);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 3px rgba(199, 154, 62, 0.15);
+  outline: none;
+}
+
+.form-field.has-error input,
+.form-field.has-error select,
+.form-field.has-error textarea {
+  border-color: var(--color-rust);
+}
+.form-field .error-message {
+  display: none;
+  color: var(--color-rust-light);
+}
+.form-field.has-error .error-message {
+  display: block;
+}
+
+/* Modal */
+.modal-backdrop {
+  background: rgba(6, 5, 7, 0.75);
+  backdrop-filter: blur(4px);
+}
+
+.modal-panel {
+  background: var(--color-ink-2);
+  border: 1px solid var(--color-line);
+}
+
+/* Rechtliches-Modal: Inhalt kommt als reines HTML aus LEGAL_CONTENT in
+   main.js (Impressum/Datenschutz/AGB) — hier nur die Typografie dafür. */
+.legal-content h3 {
+  font-family: var(--font-display);
+  color: var(--color-paper);
+  font-size: 1.1rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+.legal-content h3:first-child {
+  margin-top: 0;
+}
+.legal-content p {
+  margin-bottom: 0.75rem;
+}
+.legal-content a {
+  color: var(--color-gold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.legal-callout {
+  background: rgba(168, 70, 43, 0.14);
+  border: 1px solid rgba(168, 70, 43, 0.4);
+  color: var(--color-paper);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  font-size: 0.8rem;
+  margin-bottom: 1.25rem;
+}
+
+/* Honeypot-Feld gegen einfache Spam-Bots (siehe #review-website in
+   index.html): für Menschen unsichtbar und aus Tab-Reihenfolge sowie
+   Screenreadern ausgeschlossen (zusätzlich zu aria-hidden auf dem
+   Wrapper). Bewusst nicht "display: none" o. Ä., da manche simplen Bots
+   genau danach filtern, um Honeypots zu erkennen. */
+.honeypot-field {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* "Ich bin kein Roboter"-Bestätigung im Bewertungsformular: eigens
+   gestylte Checkbox im Look eines kleinen Stempel-Kästchens, passend zum
+   restlichen Vintage-Look (siehe .star-rating für dasselbe Prinzip). */
+.robot-check-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 1.1rem;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  background: var(--color-ink-2);
+  color: var(--color-paper-dim);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.robot-check-wrapper:hover {
+  border-color: rgba(199, 154, 62, 0.45);
+}
+.robot-check-wrapper input[type="checkbox"] {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--color-rust);
+  cursor: pointer;
+}
+.robot-check-wrapper input[type="checkbox"]:checked ~ span {
+  color: var(--color-paper);
+}
+.robot-check-wrapper input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+}
+.form-field.has-error .robot-check-wrapper {
+  border-color: var(--color-rust);
+}
+
+/* --------------------------------------------------------------------------
+   9b) ADMIN-DASHBOARD (admin.html / admin.js)
+   --------------------------------------------------------------------------
+   Feld-Grid für Buchungsanfragen: jedes Feld (Label + Wert) ist ein eigener
+   Block, der als Ganzes im Grid sitzt. Dadurch bleiben Bezeichnung und Wert
+   immer zusammen und in der richtigen Reihenfolge — unabhängig davon, wie
+   viele Spalten (mobil/desktop) gerade angezeigt werden. */
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.5rem 1.5rem;
+}
+.field-block dt {
+  color: var(--color-paper-dim);
+  opacity: 0.7;
+}
+.field-block dd {
+  margin: 0;
+}
+
+/* Echte Aktions-Buttons im Admin-Dashboard statt einfacher Text-Links —
+   Löschen (Rost, zurückhaltend) und Freigeben (Gold, positiv) klar
+   unterscheidbar und eindeutig als Aktion erkennbar. */
+.btn-admin-delete,
+.btn-admin-approve {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.375rem 0.75rem;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-admin-delete {
+  color: var(--color-rust-light);
+  border-color: rgba(168, 70, 43, 0.4);
+  background: rgba(168, 70, 43, 0.08);
+}
+.btn-admin-delete:hover,
+.btn-admin-delete:focus-visible {
+  background: rgba(168, 70, 43, 0.22);
+  border-color: var(--color-rust-light);
+}
+
+.btn-admin-approve {
+  color: var(--color-gold);
+  border-color: rgba(199, 154, 62, 0.4);
+  background: rgba(199, 154, 62, 0.1);
+}
+.btn-admin-approve:hover,
+.btn-admin-approve:focus-visible {
+  background: rgba(199, 154, 62, 0.22);
+  border-color: var(--color-gold);
+}
+
+/* Sticky Sub-Navigation im Dashboard: springt per Anker zu den Bereichen
+   und bleibt beim Scrollen oben sichtbar — gibt dem Dashboard eine klare,
+   "richtige Anwendung"-Struktur statt einer einzigen langen Liste. */
+.admin-subnav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  background: rgba(20, 16, 12, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--color-line);
+  padding: 0.75rem 0;
+  margin-bottom: 2rem;
+}
+.admin-subnav a {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-line);
+  color: var(--color-paper-dim);
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+  white-space: nowrap;
+}
+.admin-subnav a:hover,
+.admin-subnav a:focus-visible {
+  color: var(--color-paper);
+  border-color: rgba(199, 154, 62, 0.4);
+  background: rgba(199, 154, 62, 0.08);
+}
+.admin-subnav a .count {
+  color: var(--color-gold);
+  font-family: var(--font-display);
+}
+
+/* Stat-Karten mit Icon-Medaillon oben rechts. */
+.stat-card {
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+  position: relative;
+  overflow: hidden;
+}
+.stat-card-icon {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: rgba(199, 154, 62, 0.12);
+  color: var(--color-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Such-/Filterfeld über den Listen. */
+.admin-search {
+  width: 100%;
+  background: var(--color-ink-2);
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem 0.6rem 2.25rem;
+  font-size: 0.875rem;
+  color: var(--color-paper);
+}
+.admin-search:focus {
+  outline: none;
+  border-color: rgba(199, 154, 62, 0.5);
+}
+.admin-search-wrap {
+  position: relative;
+}
+.admin-search-wrap svg {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  color: var(--color-paper-dim);
+  pointer-events: none;
+}
+
+/* Runde Initialen-Kachel als kleines "Avatar" — schafft sofort visuelle
+   Anhaltspunkte in einer Liste aus sonst recht gleichförmigen Text-Karten. */
+.avatar-circle {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--color-rust), var(--color-gold));
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Kalender-Chip fürs Veranstaltungsdatum — deutlich prominenter als ein
+   Text-Feld unter vielen, da das Datum meist die wichtigste Info ist. */
+.date-chip {
+  flex-shrink: 0;
+  width: 3.25rem;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  text-align: center;
+}
+.date-chip-month {
+  display: block;
+  background: var(--color-rust);
+  color: var(--color-paper);
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0;
+}
+.date-chip-day {
+  display: block;
+  background: var(--color-ink-2);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  padding: 0.2rem 0;
+}
+
+/* Badges: Veranstaltungsart, "Neu"-Kennzeichen. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.badge-type {
+  background: rgba(236, 226, 203, 0.08);
+  color: var(--color-paper-dim);
+  border: 1px solid var(--color-line);
+}
+.badge-new {
+  background: var(--color-gold);
+  color: var(--color-ink);
+}
+
+/* Zeilen mit Icon + Label + Wert, für Kontaktdaten/Details. */
+.info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--color-paper);
+  min-width: 0;
+}
+.info-row svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--color-gold);
+  opacity: 0.8;
+}
+.info-row a {
+  color: var(--color-paper);
+  text-decoration: underline;
+  text-decoration-color: var(--color-line);
+  text-underline-offset: 2px;
+}
+.info-row a:hover {
+  color: var(--color-gold);
+}
+.info-row .info-label {
+  color: var(--color-paper-dim);
+  margin-right: 0.3rem;
+}
+
+/* Zitat-artige Box für Nachrichtentexte/Kommentare — hebt Freitext optisch
+   vom strukturierten Datenblock ab. */
+.quote-box {
+  background: var(--color-ink-2);
+  border-left: 2px solid var(--color-rust);
+  border-radius: 0 6px 6px 0;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.85rem;
+  color: var(--color-paper-dim);
+  font-style: italic;
+}
+
+/* Leerer Zustand (keine Einträge) mit dezentem Icon. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2.5rem 1rem;
+  color: var(--color-paper-dim);
+  text-align: center;
+}
+.empty-state svg {
+  width: 2rem;
+  height: 2rem;
+  opacity: 0.4;
+}
+
+.admin-card {
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+  transition: border-color 0.15s ease;
+}
+.admin-card:hover {
+  border-color: rgba(236, 226, 203, 0.2);
+}
+
+/* --------------------------------------------------------------------------
+   9c) LADEBILDSCHIRM (Preloader)
+   --------------------------------------------------------------------------
+   Eigenständiger Vollbild-Screen, der die komplette Seite (inkl. Header)
+   verdeckt, bis main.js ihn nach 2 Sekunden ausblendet. Ruhiger, dezenter
+   Verlauf in den Marken-Farben statt eines flachen Einheitstons; das
+   Wasserzeichen-Logo "atmet" leicht (Opacity-Puls), der Ladebalken darunter
+   ist die einzige explizite Fortschrittsanzeige — bewusst ohne
+   Prozentzahl, wie gewünscht.
+   -------------------------------------------------------------------------- */
+.preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(168, 70, 43, 0.16), transparent 55%),
+    radial-gradient(circle at 80% 80%, rgba(199, 154, 62, 0.12), transparent 55%),
+    var(--color-ink);
+  transition: opacity 0.5s ease;
+}
+.preloader.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.preloader-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(60vw, 420px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(199, 154, 62, 0.22), transparent 70%);
+  animation: preloader-breathe 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.preloader-logo {
+  position: relative;
+  width: clamp(140px, 32vw, 210px);
+  height: auto;
+  animation: preloader-logo-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes preloader-breathe {
+  0%, 100% {
+    opacity: 0.85;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.04);
+  }
+}
+
+@keyframes preloader-logo-breathe {
+  0%, 100% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+}
+
+.preloader-bar-track {
+  position: relative;
+  width: min(60vw, 220px);
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-ink-2);
+  overflow: hidden;
+}
+.preloader-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-rust), var(--color-gold));
+}
+
+/* --------------------------------------------------------------------------
+   10) EINBLEND-ANIMATION BEIM LADEN (ein einziger orchestrierter Moment,
+   nicht auf jeder Sektion wiederholt)
+   -------------------------------------------------------------------------- */
+.hero-in {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: hero-reveal 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.hero-in.delay-1 { animation-delay: 0.1s; }
+.hero-in.delay-2 { animation-delay: 0.2s; }
+.hero-in.delay-3 { animation-delay: 0.3s; }
+.hero-in.delay-4 { animation-delay: 0.4s; }
+
+@keyframes hero-reveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Sektionen, die beim Scrollen ins Bild kommen, erhalten die Klasse
+   "in-view" per JS (IntersectionObserver) – siehe main.js */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* --------------------------------------------------------------------------
+   11) TOAST (Erfolgsmeldung nach Formular-Versand)
+   -------------------------------------------------------------------------- */
+.toast {
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-gold);
+  transform: translateY(120%);
+  /* Zusätzlich zur Verschiebung nach unten komplett unsichtbar/nicht
+     interaktiv machen — verhindert zuverlässig, dass der Rahmen der
+     leeren Box (z. B. bei sehr kurzer Höhe ohne Text) am Bildschirmrand
+     durchschimmert, unabhängig von Rundungsfehlern beim Transform. */
+  opacity: 0;
+  visibility: hidden;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease,
+    visibility 0s linear 0.35s;
+}
+.toast.is-visible {
+  transform: translateY(0);
+  opacity: 1;
+  visibility: visible;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease,
+    visibility 0s linear 0s;
+}

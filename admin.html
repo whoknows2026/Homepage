@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <!-- Kein Suchmaschinen-Index für den Admin-Bereich. Das ersetzt keine
+       echte Zugriffskontrolle (die übernehmen Firebase Auth + Firestore-
+       Regeln), verhindert aber, dass die Seite bei Google & Co. auftaucht. -->
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Admin-Bereich — Who Knows?</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: "#14100c",
+            "ink-2": "#1c1712",
+            charcoal: "#241d16",
+            paper: "#ece2cb",
+            "paper-dim": "#c8bb9a",
+            rust: "#a8462b",
+            "rust-light": "#c65f3f",
+            gold: "#c79a3e",
+          },
+          fontFamily: {
+            display: ["Anton", "Arial Narrow", "sans-serif"],
+            body: ["Work Sans", "Segoe UI", "sans-serif"],
+          },
+        },
+      },
+    };
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="assets/css/style.css" />
+
+  <!-- Firebase (siehe assets/js/firebase-config.js für Einrichtung) -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+  <script src="assets/js/firebase-config.js"></script>
+</head>
+
+<body class="font-body bg-ink text-paper min-h-screen">
+  <header class="site-nav">
+    <div class="max-w-5xl mx-auto px-5 sm:px-8 h-20 flex items-center justify-between">
+      <a href="index.html" class="flex items-center gap-3">
+        <img src="assets/img/logo-badge.png" alt="Who Knows? Logo" class="h-12 w-12 rounded-full object-cover ring-1 ring-white/10" />
+        <span class="font-display text-lg tracking-wide">Admin-Bereich</span>
+      </a>
+      <div class="flex items-center gap-4">
+        <a href="index.html" class="nav-link text-sm">Zur Website</a>
+        <button type="button" id="logout-btn" class="btn-ghost hidden text-sm px-4 py-2 rounded-sm">
+          Abmelden
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-5 sm:px-8 pt-12 sm:pt-16 pb-20">
+    <!-- ==========================================================================
+         FIREBASE NICHT KONFIGURIERT — Hinweis
+         ========================================================================== -->
+    <div id="firebase-missing" class="hidden max-w-lg mx-auto text-center player-panel rounded-md p-8">
+      <h1 class="font-display text-3xl mb-4">Firebase ist noch nicht eingerichtet</h1>
+      <p class="text-paper-dim text-sm leading-relaxed">
+        Der Admin-Bereich braucht ein verbundenes Firebase-Projekt (Login,
+        Statistik, Buchungsanfragen). Bitte tragt eure Zugangsdaten in
+        <code class="text-gold">assets/js/firebase-config.js</code> ein —
+        die genaue Anleitung steht in der <code class="text-gold">README.md</code>
+        im Abschnitt „Admin-Bereich &amp; Bewertungen einrichten".
+      </p>
+    </div>
+
+    <!-- ==========================================================================
+         LOGIN
+         ========================================================================== -->
+    <div id="login-view" class="hidden max-w-sm mx-auto player-panel rounded-md p-8">
+      <h1 class="font-display text-3xl mb-2 text-center">Admin-Login</h1>
+      <p class="text-paper-dim text-sm text-center mb-8">
+        Nur für Bandmitglieder mit Zugang.
+      </p>
+
+      <form id="login-form" novalidate>
+        <div class="form-field mb-5">
+          <label for="login-email" class="block text-sm mb-2">E-Mail</label>
+          <input id="login-email" type="email" required autocomplete="username" class="w-full rounded-sm px-4 py-3 text-sm" />
+        </div>
+        <div class="form-field mb-2">
+          <label for="login-password" class="block text-sm mb-2">Passwort</label>
+          <input id="login-password" type="password" required autocomplete="current-password" class="w-full rounded-sm px-4 py-3 text-sm" />
+        </div>
+        <p id="login-error" class="hidden text-sm text-rust-light mb-4" role="alert"></p>
+        <button type="submit" class="btn-primary w-full px-6 py-3.5 rounded-sm text-base mt-4">
+          Anmelden
+        </button>
+      </form>
+
+      <p class="text-xs text-paper-dim text-center mt-6">
+        Admin-Zugang wird in der Firebase Console angelegt (Authentication →
+        Nutzer hinzufügen), nicht auf dieser Seite.
+      </p>
+    </div>
+
+    <!-- ==========================================================================
+         DASHBOARD (erst sichtbar nach Login)
+         ========================================================================== -->
+    <div id="dashboard-view" class="hidden">
+      <div class="reveal in-view mb-6">
+        <h1 class="font-display text-4xl sm:text-5xl mb-2">Dashboard</h1>
+        <p class="text-paper-dim" id="welcome-text">Willkommen zurück.</p>
+      </div>
+
+      <!-- Sticky Sub-Navigation -->
+      <nav class="admin-subnav" aria-label="Dashboard-Bereiche">
+        <a href="#uebersicht">Übersicht</a>
+        <a href="#buchungen">Buchungsanfragen <span class="count" id="subnav-count-bookings"></span></a>
+        <a href="#bewertungen">Bewertungen <span class="count" id="subnav-count-reviews"></span></a>
+      </nav>
+
+      <!-- Statistik -->
+      <section id="uebersicht" class="mb-16 scroll-mt-24">
+        <h2 class="font-display text-2xl mb-5">Statistik</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="stat-card rounded-md p-6">
+            <div class="stat-card-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4" aria-hidden="true"><path d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
+            </div>
+            <p class="text-xs uppercase tracking-wide text-paper-dim mb-2">Besuche gesamt</p>
+            <p id="stat-visits" class="font-display text-4xl text-gold">–</p>
+          </div>
+          <div class="stat-card rounded-md p-6">
+            <div class="stat-card-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4" aria-hidden="true"><path d="M19 4h-1V3a1 1 0 1 0-2 0v1H8V3a1 1 0 0 0-2 0v1H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14zm0-12H5V6h14z"/></svg>
+            </div>
+            <p class="text-xs uppercase tracking-wide text-paper-dim mb-2">Offene Buchungsanfragen</p>
+            <p id="stat-bookings" class="font-display text-4xl text-gold">–</p>
+          </div>
+          <div class="stat-card rounded-md p-6">
+            <div class="stat-card-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4" aria-hidden="true"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>
+            </div>
+            <p class="text-xs uppercase tracking-wide text-paper-dim mb-2">Bewertungen zur Prüfung</p>
+            <p id="stat-pending-reviews" class="font-display text-4xl text-gold">–</p>
+          </div>
+        </div>
+        <p class="text-xs text-paper-dim mt-4">
+          Hinweis: Der Besucherzähler ist ein einfacher, clientseitiger Zähler
+          (ein Zähler-Impuls pro Browser-Sitzung) — für belastbare Analytics
+          empfiehlt sich ergänzend ein dedizierter Dienst wie Plausible oder
+          Google Analytics.
+        </p>
+      </section>
+
+      <!-- Buchungsanfragen -->
+      <section id="buchungen" class="mb-16 scroll-mt-24">
+        <div class="flex items-center justify-between gap-4 mb-5 flex-wrap">
+          <h2 class="font-display text-2xl">Buchungsanfragen</h2>
+        </div>
+        <div class="admin-search-wrap mb-5">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 5L20.49 19zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
+          <input type="search" id="bookings-search" class="admin-search" placeholder="Nach Name, Ort oder Datum suchen …" />
+        </div>
+        <div id="bookings-list" class="space-y-4">
+          <p class="text-paper-dim text-sm">Lädt …</p>
+        </div>
+      </section>
+
+      <!-- Bewertungen -->
+      <section id="bewertungen" class="mb-16 scroll-mt-24">
+        <h2 class="font-display text-2xl mb-5">Bewertungen</h2>
+
+        <h3 class="font-display text-lg text-gold mb-4">Wartet auf Freigabe</h3>
+        <div id="pending-reviews-list" class="space-y-4 mb-10">
+          <p class="text-paper-dim text-sm">Lädt …</p>
+        </div>
+
+        <h3 class="font-display text-lg text-paper-dim mb-4">Veröffentlicht</h3>
+        <div class="admin-search-wrap mb-5">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 5L20.49 19zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
+          <input type="search" id="published-search" class="admin-search" placeholder="Nach Name oder Text suchen …" />
+        </div>
+        <div id="published-reviews-list" class="space-y-4">
+          <p class="text-paper-dim text-sm">Lädt …</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="assets/js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+- band/    : Portraetfotos der 6 Mitglieder ablegen (siehe Kommentare in index.html)
+- logos/   : Location-/Festival-Logos ablegen
+- gallery/ : Fotos fuer die Bildergalerie ablegen (siehe README.md, Abschnitt 2)
+- logo.png bzw. logo-badge.png sind bereits mit eurem Bandlogo befuellt.
