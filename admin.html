@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <!-- Kein Suchmaschinen-Index für den Admin-Bereich. Das ersetzt keine
+       echte Zugriffskontrolle (die übernehmen Firebase Auth + Firestore-
+       Regeln), verhindert aber, dass die Seite bei Google & Co. auftaucht. -->
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Admin-Bereich — Who Knows?</title>
+
+  <!-- Favicon (identisch zur Hauptseite) -->
+  <link rel="icon" type="image/x-icon" href="assets/img/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/img/apple-touch-icon.png" />
+  <meta name="theme-color" content="#14100c" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: "#14100c",
+            "ink-2": "#1c1712",
+            charcoal: "#241d16",
+            paper: "#ece2cb",
+            "paper-dim": "#c8bb9a",
+            rust: "#a8462b",
+            "rust-light": "#c65f3f",
+            gold: "#c79a3e",
+          },
+          fontFamily: {
+            display: ["Anton", "Arial Narrow", "sans-serif"],
+            body: ["Work Sans", "Segoe UI", "sans-serif"],
+          },
+        },
+      },
+    };
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="assets/css/style.css" />
+
+  <!-- Firebase (siehe assets/js/firebase-config.js für Einrichtung) -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+  <script src="assets/js/firebase-config.js"></script>
+</head>
+
+<body class="font-body bg-ink text-paper min-h-screen">
+  <!-- ==========================================================================
+       FIREBASE NICHT KONFIGURIERT / LOGIN
+       --------------------------------------------------------------------------
+       Diese beiden Zustände zeigen noch keine Sidebar — die gibt es erst im
+       eingeloggten Dashboard weiter unten.
+       ========================================================================== -->
+  <div class="max-w-lg mx-auto px-5 pt-20">
+    <div id="firebase-missing" class="hidden text-center player-panel rounded-md p-8">
+      <h1 class="font-display text-3xl mb-4">Firebase ist noch nicht eingerichtet</h1>
+      <p class="text-paper-dim text-sm leading-relaxed">
+        Der Admin-Bereich braucht ein verbundenes Firebase-Projekt (Login,
+        Statistik, Buchungsanfragen). Bitte tragt eure Zugangsdaten in
+        <code class="text-gold">assets/js/firebase-config.js</code> ein —
+        die genaue Anleitung steht in der <code class="text-gold">README.md</code>
+        im Abschnitt „Admin-Bereich &amp; Bewertungen einrichten".
+      </p>
+    </div>
+
+    <div id="login-view" class="hidden player-panel rounded-md p-8">
+      <div class="flex items-center justify-center gap-3 mb-6">
+        <img src="assets/img/logo-badge.png" alt="Who Knows? Logo" class="h-12 w-12 rounded-full object-cover ring-1 ring-white/10" />
+      </div>
+      <h1 class="font-display text-3xl mb-2 text-center">Admin-Login</h1>
+      <p class="text-paper-dim text-sm text-center mb-8">
+        Nur für Bandmitglieder mit Zugang.
+      </p>
+
+      <form id="login-form" novalidate>
+        <div class="form-field mb-5">
+          <label for="login-email" class="block text-sm mb-2">E-Mail</label>
+          <input id="login-email" type="email" required autocomplete="username" class="w-full rounded-sm px-4 py-3 text-sm" />
+        </div>
+        <div class="form-field mb-2">
+          <label for="login-password" class="block text-sm mb-2">Passwort</label>
+          <input id="login-password" type="password" required autocomplete="current-password" class="w-full rounded-sm px-4 py-3 text-sm" />
+        </div>
+        <p class="text-right text-xs mb-3">
+          <button type="button" id="forgot-password-btn" class="text-paper-dim underline underline-offset-2 hover:text-paper">Passwort vergessen?</button>
+        </p>
+        <p id="login-info" class="hidden text-sm text-gold mb-4" role="status"></p>
+        <p id="login-error" class="hidden text-sm text-rust-light mb-4" role="alert"></p>
+        <button type="submit" class="btn-primary w-full px-6 py-3.5 rounded-sm text-base mt-4">
+          Anmelden
+        </button>
+      </form>
+
+      <a href="index.html" class="block text-center text-xs text-paper-dim mt-6 hover:text-paper">← Zurück zur Website</a>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       DASHBOARD (erst sichtbar nach Login) — Sidebar-Layout
+       ========================================================================== -->
+  <div id="dashboard-view" class="hidden admin-shell">
+    <!-- SIDEBAR / mobil: horizontale Tab-Leiste oben -->
+    <aside class="admin-sidebar">
+      <a href="index.html" class="admin-sidebar-brand">
+        <img src="assets/img/logo-badge.png" alt="" class="h-9 w-9 rounded-full object-cover ring-1 ring-white/10 shrink-0" />
+        <span class="admin-sidebar-brand-text">
+          <span class="block font-display text-sm leading-tight">Who Knows?</span>
+          <span class="block text-[10px] text-paper-dim uppercase tracking-wide">Admin</span>
+        </span>
+      </a>
+
+      <nav class="admin-nav" aria-label="Admin-Bereiche">
+        <button type="button" class="admin-nav-item" data-view="uebersicht">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 13h6V4H4zm0 7h6v-5H4zm8 0h8V11h-8zm0-16v5h8V4z"/></svg>
+          <span class="nav-label">Übersicht</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-view="kalender">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2zm12 8v10H5V10zM7 12h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2zM7 16h2v2H7zm4 0h2v2h-2z"/></svg>
+          <span class="nav-label">Kalender</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-view="buchungen">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 4h-1V3a1 1 0 1 0-2 0v1H8V3a1 1 0 0 0-2 0v1H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14zm0-12H5V6h14z"/></svg>
+          <span class="nav-label">Buchungsanfragen</span>
+          <span id="badge-bookings" class="nav-badge hidden">0</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-view="bewertungen">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>
+          <span class="nav-label">Bewertungen</span>
+          <span id="badge-reviews" class="nav-badge hidden">0</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-view="termine">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2zm12 8v10H5V10zM7 12h5v5H7z"/></svg>
+          <span class="nav-label">Termine</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-view="setlisten">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h2v2H3zm4 0h14v2H7zM3 11h2v2H3zm4 0h14v2H7zm-4 6h2v2H3zm4 0h14v2H7z"/></svg>
+          <span class="nav-label">Setlisten</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-view="band">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+          <span class="nav-label">Band</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-view="auftrittsorte">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>
+          <span class="nav-label">Auftrittsorte</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-view="playlist">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm12-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg>
+          <span class="nav-label">Playlist</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-view="medien">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 3l-1.83 2H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.17L15 3H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+          <span class="nav-label">Galerie &amp; Videos</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-view="faq">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 18h2v-2h-2zm1-16a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm0-14a4 4 0 0 0-4 4h2a2 2 0 1 1 4 0c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5a4 4 0 0 0-4-4z"/></svg>
+          <span class="nav-label">FAQ</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-view="einstellungen">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7 7 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54a7 7 0 0 0-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.74 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.05.3-.07.63-.07.94s.02.64.07.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.12.22.37.3.61.22l2.39-.96c.5.38 1.04.7 1.62.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54a7 7 0 0 0 1.62-.94l2.39.96c.22.09.49 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/></svg>
+          <span class="nav-label">Einstellungen</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-view="backup">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+          <span class="nav-label">Datensicherung</span>
+        </button>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <a href="index.html" class="admin-nav-item">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 17l1.41-1.41L8.83 13H21v-2H8.83l2.58-2.59L10 7l-5 5zM3 5h6v2H5v10h4v2H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" transform="scale(-1,1) translate(-24,0)"/></svg>
+          <span class="nav-label">Zur Website</span>
+        </a>
+        <button type="button" id="logout-btn" class="admin-nav-item hidden">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 17l1.41-1.41L8.83 13H21v-2H8.83l2.58-2.59L10 7l-5 5zM3 5h6v2H5v10h4v2H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/></svg>
+          <span class="nav-label">Abmelden</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- HAUPTBEREICH -->
+    <main class="admin-main">
+      <header class="admin-topbar">
+        <h1 id="admin-view-title" class="font-display text-2xl sm:text-3xl">Übersicht</h1>
+        <p class="text-paper-dim text-sm" id="welcome-text">Willkommen zurück.</p>
+      </header>
+
+      <div class="admin-views">
+        <!-- ÜBERSICHT -->
+        <section class="admin-view" data-view-panel="uebersicht">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <a href="#" data-view="uebersicht" class="stat-card rounded-md p-6 admin-nav-link">
+              <div class="stat-card-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4" aria-hidden="true"><path d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
+              </div>
+              <p class="text-xs uppercase tracking-wide text-paper-dim mb-2">Seitenaufrufe gesamt</p>
+              <p id="stat-visits" class="font-display text-4xl text-gold">–</p>
+            </a>
+            <a href="#" data-view="buchungen" class="stat-card rounded-md p-6 admin-nav-link">
+              <div class="stat-card-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4" aria-hidden="true"><path d="M19 4h-1V3a1 1 0 1 0-2 0v1H8V3a1 1 0 0 0-2 0v1H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14zm0-12H5V6h14z"/></svg>
+              </div>
+              <p class="text-xs uppercase tracking-wide text-paper-dim mb-2">Offene Buchungsanfragen</p>
+              <p id="stat-bookings" class="font-display text-4xl text-gold">–</p>
+            </a>
+            <a href="#" data-view="bewertungen" class="stat-card rounded-md p-6 admin-nav-link">
+              <div class="stat-card-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4" aria-hidden="true"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>
+              </div>
+              <p class="text-xs uppercase tracking-wide text-paper-dim mb-2">Bewertungen zur Prüfung</p>
+              <p id="stat-pending-reviews" class="font-display text-4xl text-gold">–</p>
+            </a>
+          </div>
+          <p class="text-xs text-paper-dim mb-10">
+            Hinweis: Der Zähler zählt jeden Seitenaufruf (auch erneutes Laden und
+            Suchmaschinen-Roboter) und speichert dafür nichts im Browser der
+            Besucher. Die Zahl ist ein Näherungswert — für belastbare Analytics
+            empfiehlt sich ergänzend ein dedizierter Dienst wie Plausible oder
+            Google Analytics.
+          </p>
+
+          <div id="setup-banner" class="hidden admin-hint mb-8" style="border-color: rgba(168,70,43,.6); background: rgba(168,70,43,.15); color: #f3d9cf;">
+            <strong>Impressum unvollständig:</strong> Name und Anschrift fehlen noch — ohne sie darf die Seite nicht
+            online gehen.
+            <a href="#" data-view="einstellungen" class="admin-nav-link underline text-paper">Jetzt ausfüllen</a>
+          </div>
+
+          <h2 class="font-display text-xl mb-4">Heute zu tun</h2>
+          <div id="today-list" class="today-list mb-8"><p class="text-paper-dim text-sm">Lädt …</p></div>
+
+          <h2 class="font-display text-xl mb-4">Benachrichtigungen</h2>
+          <div class="admin-card rounded-md p-5 mb-10">
+            <p class="text-paper-dim text-sm mb-4 max-w-2xl">
+              Bei einer neuen Buchungsanfrage zeigt der Browser-Tab die Anzahl an (z. B. „(2) Admin-Bereich …“),
+              im Fenster erscheint ein Hinweis, und auf Wunsch gibt es einen leisen Signalton und eine
+              Browser-Benachrichtigung. <strong class="text-paper">Das funktioniert, solange der Admin-Bereich in einem
+              Browser-Tab geöffnet ist</strong> (auch im Hintergrund). Bei geschlossener Seite oder aufs Handy
+              geht es nicht ohne einen bezahlten Server-Dienst.
+            </p>
+            <label class="flex items-center gap-2 text-sm mb-3 cursor-pointer">
+              <input type="checkbox" id="notify-sound" checked /> Signalton bei neuer Anfrage
+            </label>
+            <div class="flex flex-wrap items-center gap-3">
+              <button type="button" id="notify-desktop-btn" class="btn-ghost text-sm px-4 py-2.5 rounded-sm">Browser-Benachrichtigungen aktivieren</button>
+              <button type="button" id="notify-test-btn" class="btn-ghost text-sm px-4 py-2.5 rounded-sm">Signalton testen</button>
+              <span id="notify-status" class="text-xs text-paper-dim"></span>
+            </div>
+          </div>
+
+          <h2 class="font-display text-xl mb-4">Verlauf der letzten 30 Tage</h2>
+          <div id="stats-summary" class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4"></div>
+          <div id="stats-chart" class="admin-card rounded-md p-4 mb-10"><p class="text-paper-dim text-sm">Lädt …</p></div>
+
+          <h2 class="font-display text-xl mb-4">Ankündigungs-Banner</h2>
+          <div class="admin-card rounded-md p-5 mb-10">
+            <p class="text-paper-dim text-sm mb-4">
+              Zeigt oben auf der Homepage einen auffälligen Streifen — z. B.
+              „Gig am 19.9. leider abgesagt“ oder „Neue Single ist draußen“.
+              Besucher können ihn mit dem × schließen; ändert ihr den Text,
+              erscheint er für alle wieder.
+            </p>
+            <form id="announcement-form" class="space-y-3" novalidate>
+              <input
+                type="text"
+                id="announcement-text-input"
+                maxlength="160"
+                placeholder="Text der Ankündigung (max. 160 Zeichen)"
+                class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper"
+              />
+              <label class="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" id="announcement-active-input" />
+                Banner auf der Homepage anzeigen
+              </label>
+              <div class="flex items-center gap-3">
+                <button type="submit" class="btn-admin-approve px-5">Speichern</button>
+                <span id="announcement-status" class="text-xs text-paper-dim"></span>
+              </div>
+            </form>
+          </div>
+
+          <h2 class="font-display text-xl mb-4">Neueste Aktivität</h2>
+          <div id="activity-feed" class="space-y-2">
+            <p class="text-paper-dim text-sm">Lädt …</p>
+          </div>
+        </section>
+
+        <!-- EINSTELLUNGEN -->
+        <section class="admin-view" data-view-panel="einstellungen">
+          <div id="setup-check" class="admin-hint mb-6">Lädt …</div>
+
+          <form id="settings-form" novalidate>
+            <h2 class="font-display text-lg text-gold mb-2">Impressum &amp; Kontakt</h2>
+            <p class="text-paper-dim text-sm mb-4">
+              Diese Angaben setzt die Seite automatisch in <strong class="text-paper">Impressum</strong> und
+              <strong class="text-paper">Datenschutzerklärung</strong> ein — ganz ohne Code. Ohne Name und
+              Anschrift darf die Seite nicht online gehen. Leer gelassene Felder zeigen auf der Seite einen
+              Platzhalter.
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
+              <div><label for="set-owner-name" class="block text-xs text-paper-dim mb-1">Name der verantwortlichen Person</label><input id="set-owner-name" type="text" placeholder="Vor- und Nachname" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" /></div>
+              <div><label for="set-contact-email" class="block text-xs text-paper-dim mb-1">Kontakt-E-Mail (Impressum / Datenschutz)</label><input id="set-contact-email" type="email" placeholder="info@who-knows-coverband.de" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" /></div>
+              <div><label for="set-owner-street" class="block text-xs text-paper-dim mb-1">Straße und Hausnummer</label><input id="set-owner-street" type="text" placeholder="" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" /></div>
+              <div><label for="set-owner-city" class="block text-xs text-paper-dim mb-1">PLZ und Ort</label><input id="set-owner-city" type="text" placeholder="" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" /></div>
+            </div>
+
+            <h2 class="font-display text-lg text-gold mb-2">Instagram</h2>
+            <div class="grid grid-cols-1 gap-3 mb-8">
+              <div><label for="set-instagram" class="block text-xs text-paper-dim mb-1">Adresse eures Instagram-Profils (muss mit https:// beginnen)</label><input id="set-instagram" type="url" placeholder="https://www.instagram.com/…" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" /></div>
+            </div>
+
+            <h2 class="font-display text-lg text-gold mb-2">Zusagen und Termine</h2>
+            <p class="text-paper-dim text-sm mb-4 max-w-2xl">
+              Was soll passieren, wenn ihr eine Buchungsanfrage auf „Zugesagt“ setzt?
+              <strong class="text-paper">Achtung:</strong> Die Liste „Termine“ ist auf der Homepage öffentlich
+              sichtbar — auch der Ort aus der Anfrage. Bei privaten Feiern (Hochzeit, Geburtstag …) ist
+              „Jedes Mal nachfragen“ oder „Nur den Tag sperren“ die sicherere Wahl.
+            </p>
+            <div class="grid grid-cols-1 gap-3 mb-8">
+              <div>
+                <label for="set-booking-to-show" class="block text-xs text-paper-dim mb-1">Bei Zusage</label>
+                <select id="set-booking-to-show" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper">
+                  <option value="auto">Automatisch unter „Termine“ eintragen (öffentlich sichtbar)</option>
+                  <option value="ask">Jedes Mal nachfragen</option>
+                  <option value="off">Nur den Tag im Kalender sperren (nicht öffentlich)</option>
+                </select>
+              </div>
+            </div>
+
+            <h2 class="font-display text-lg text-gold mb-2">Texte auf der Startseite</h2>
+            <p class="text-paper-dim text-sm mb-4">Hier steht der aktuelle Text der Startseite — einfach ändern und speichern. Leert ihr ein Feld, kommt wieder der Standardtext.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+              <div class="sm:col-span-2"><div><label for="set-hero-claim" class="block text-xs text-paper-dim mb-1">Kleine Zeile über dem Titel</label><input id="set-hero-claim" type="text" placeholder="Rock · Blues · Country — sechs Musiker, eine Bühne" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" /></div></div>
+              <div class="sm:col-span-2"><label for="set-hero-text" class="block text-xs text-paper-dim mb-1">Text unter dem Titel</label><textarea id="set-hero-text" rows="5" placeholder="Niemand weiß, welcher Song als Nächstes kommt …" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper"></textarea></div>
+              <div class="sm:col-span-2"><label for="set-band-intro" class="block text-xs text-paper-dim mb-1">Einleitung im Bereich „Die Band“</label><textarea id="set-band-intro" rows="4" placeholder="Sechs Persönlichkeiten, ein Sound …" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper"></textarea></div>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <button type="submit" class="btn-admin-approve px-5">Speichern</button>
+              <span id="settings-status" class="text-xs text-gold"></span>
+            </div>
+          </form>
+
+        </section>
+
+        <!-- FAQ -->
+        <section class="admin-view" data-view-panel="faq">
+          <p class="text-paper-dim text-sm mb-5 max-w-2xl">
+            Häufige Fragen von Veranstaltern erscheinen auf der Startseite als aufklappbare Liste (und helfen
+            bei Google). Der Bereich bleibt ausgeblendet, solange keine Frage existiert. Absätze in der
+            Antwort trennt ihr mit einer Leerzeile.
+          </p>
+          <form id="faq-form" class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6" novalidate>
+            <input id="faq-question-input" type="text" placeholder="Frage, z. B. Wie lange spielt ihr?" class="sm:col-span-3 w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" />
+            <input id="faq-order-input" type="number" min="1" placeholder="Reihenfolge" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" />
+            <textarea id="faq-answer-input" rows="3" placeholder="Antwort" class="sm:col-span-4 w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper"></textarea>
+            <button type="submit" class="btn-admin-approve shrink-0 px-5 sm:col-span-4 sm:w-auto sm:justify-self-start">Frage hinzufügen</button>
+          </form>
+          <div id="faq-admin-list" class="space-y-3">
+            <p class="text-paper-dim text-sm">Lädt …</p>
+          </div>
+        </section>
+
+        <!-- DATENSICHERUNG -->
+        <section class="admin-view" data-view-panel="backup">
+          <div class="admin-hint mb-8">
+            Firebase legt im Gratis-Tarif <strong class="text-paper">keine automatischen Backups</strong> an. Sichert
+            deshalb regelmäßig (z. B. einmal im Monat) und hebt die Datei sicher auf — sie enthält persönliche Daten
+            aus Anfragen, bitte nicht weitergeben.
+            <br /><strong class="text-paper">Nicht in der Sicherung:</strong> Admin-Konten und Passwörter, die
+            Firestore-Regeln sowie Fotos, MP3s und der Seitencode (die liegen im Repository bzw. in eurer ZIP-Datei).
+          </div>
+
+          <h2 class="font-display text-lg text-gold mb-2">Sicherung herunterladen</h2>
+          <p class="text-paper-dim text-sm mb-4 max-w-2xl">
+            Lädt alle Inhalte (Anfragen, Bewertungen, Termine, Band, FAQ, Sperren, Einstellungen, Zähler …) als eine
+            Datei herunter.
+          </p>
+          <div class="flex items-center gap-3 mb-12">
+            <button type="button" id="backup-btn" class="btn-ghost text-sm px-4 py-2.5 rounded-sm">Alles herunterladen</button>
+            <span id="backup-status" class="text-xs text-paper-dim"></span>
+          </div>
+
+          <h2 class="font-display text-lg text-gold mb-2">Sicherung einspielen</h2>
+          <p class="text-paper-dim text-sm mb-4 max-w-2xl">
+            Stellt Inhalte aus einer zuvor heruntergeladenen Sicherung wieder her. Ihr seht vorher, was in der Datei
+            steckt, und wählt die Bereiche aus. <strong class="text-paper">Es wird nichts gelöscht:</strong> Einträge mit
+            derselben Kennung werden durch die Version aus der Datei ersetzt (neuere Änderungen daran gehen verloren),
+            fehlende Einträge werden neu angelegt.
+          </p>
+          <input type="file" id="restore-file" accept=".json,application/json" class="block w-full max-w-xl text-sm text-paper-dim file:mr-4 file:rounded-sm file:border-0 file:bg-ink-2 file:px-4 file:py-2.5 file:text-paper" />
+          <div id="restore-summary" class="mt-5 max-w-xl"></div>
+          <label class="flex items-center gap-2 text-sm mt-5 cursor-pointer">
+            <input type="checkbox" id="restore-safety" checked />
+            Vorher automatisch eine Sicherung des aktuellen Stands herunterladen (empfohlen)
+          </label>
+          <div class="flex items-center gap-3 mt-4">
+            <button type="button" id="restore-btn" class="btn-admin-delete px-5" disabled>Ausgewählte Bereiche einspielen</button>
+            <span id="restore-status" class="text-xs text-paper-dim"></span>
+          </div>
+          <div id="restore-result" class="mt-5 max-w-xl"></div>
+        </section>
+
+        <!-- KALENDER -->
+        <section class="admin-view" data-view-panel="kalender">
+          <div class="admin-hint mb-5">
+            <strong class="text-paper">So funktioniert’s:</strong> Im Buchungsformular
+            der Homepage können Besucher nur freie Tage wählen. <strong class="text-paper">Gesperrt</strong>
+            sind (1) alle Tage mit einem Auftritt aus „Termine“ und (2) alles, was ihr
+            hier sperrt — z. B. Urlaub, Proben oder Privates. Dort erscheinen gesperrte Tage
+            nur als „nicht verfügbar“, der Grund bleibt intern.
+            <br />Klick auf einen Tag zeigt Details und sperrt/gibt ihn frei. Der Knopf
+            „KW …“ links sperrt bzw. gibt die <strong class="text-paper">ganze Woche</strong> frei.
+            Längere Zeiträume (z. B. Urlaub) unten über „Zeitraum sperren“.
+            <br /><strong class="text-paper">Private Auftritte</strong> (Hochzeit, Firmenfeier …) tragt ihr hier einfach
+            als gesperrten Tag mit Notiz ein — oder ihr setzt die Anfrage auf „Zugesagt“, dann passiert das
+            automatisch. So steht nichts Privates öffentlich in der Datenbank.
+          </div>
+
+          <div class="acal-layout">
+            <div>
+              <div class="acal">
+                <div class="acal-head">
+                  <button type="button" id="acal-prev" class="cal-nav" aria-label="Vorheriger Monat">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+                  </button>
+                  <h2 id="acal-title" class="acal-title" aria-live="polite"></h2>
+                  <button type="button" id="acal-next" class="cal-nav" aria-label="Nächster Monat">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+                  </button>
+                  <button type="button" id="acal-today" class="btn-ghost text-xs px-3 py-2 rounded-sm">Heute</button>
+                </div>
+                <div id="acal-grid" class="acal-grid"></div>
+                <p class="acal-legend">
+                  <span><i class="acal-dot acal-dot--show"></i> Auftritt</span>
+                  <span><i class="acal-dot acal-dot--neu"></i> Anfrage neu</span>
+                  <span><i class="acal-dot acal-dot--bearbeitung"></i> in Bearbeitung</span>
+                  <span><i class="acal-dot acal-dot--zugesagt"></i> zugesagt</span>
+                  <span><i class="acal-key-blocked"></i> gesperrt</span>
+                </p>
+              </div>
+              <div class="mt-3">
+                <label for="acal-reason" class="block text-xs text-paper-dim mb-1">Grund / Notiz für neue Sperren per Tag/Woche (optional, nur intern sichtbar)</label>
+                <input type="text" id="acal-reason" placeholder="z. B. Urlaub, Probenwochenende, Hochzeit Müller (privat)" class="w-full rounded-sm px-4 py-2.5 text-sm bg-ink-2 border border-white/10 text-paper" />
+              </div>
+            </div>
+            <aside><div id="acal-day-panel" class="admin-card rounded-md p-5"></div></aside>
+          </div>
+
+          <h2 class="font-display text-lg text-gold mt-10 mb-4">Zeitraum sperren</h2>
+          <form id="block-form" class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6" novalidate>
+            <div>
+              <label for="block-from-input" class="block text-xs text-paper-dim mb-1">Von</label>
+              <input type="date" id="block-from-input" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" />
+            </div>
+            <div>
+              <label for="block-to-input" class="block text-xs text-paper-dim mb-1">Bis (einschließlich)</label>
+              <input type="date" id="block-to-input" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" />
+            </div>
+            <div class="sm:col-span-2">
+              <label for="block-reason-input" class="block text-xs text-paper-dim mb-1">Grund (intern)</label>
+              <input type="text" id="block-reason-input" placeholder="z. B. Urlaub" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" />
+            </div>
+            <button type="submit" class="btn-admin-delete shrink-0 px-5 sm:col-span-4 sm:w-auto sm:justify-self-start">Zeitraum sperren</button>
+          </form>
+
+          <h2 class="font-display text-lg text-paper-dim mb-4">Alle Sperren</h2>
+          <div id="blocked-list" class="space-y-3">
+            <p class="text-paper-dim text-sm">Lädt …</p>
+          </div>
+        </section>
+
+        <!-- BUCHUNGSANFRAGEN -->
+        <section class="admin-view" data-view-panel="buchungen">
+          <div class="flex items-center justify-between gap-4 mb-5 flex-wrap">
+            <div class="admin-search-wrap flex-1" style="min-width:240px;">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 5L20.49 19zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
+              <input type="search" id="bookings-search" class="admin-search" placeholder="Nach Name, Ort oder Datum suchen …" />
+            </div>
+            <button type="button" id="export-bookings-btn" class="btn-ghost text-sm px-4 py-2.5 rounded-sm shrink-0">
+              <svg class="w-3.5 h-3.5 inline -mt-0.5 mr-1" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 20h14v-2H5zM12 2v12.17l3.59-3.58L17 12l-5 5-5-5 1.41-1.41L11 14.17V2z"/></svg>
+              CSV exportieren
+            </button>
+          </div>
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <div id="booking-filters" class="flex flex-wrap gap-2"></div>
+            <label class="text-xs text-paper-dim flex items-center gap-2">
+              Sortierung
+              <select id="booking-sort" class="rounded-sm px-3 py-2 text-sm bg-ink-2 border border-white/10 text-paper">
+                <option value="eingang">Nach Eingang (neueste zuerst)</option>
+                <option value="datum">Nach Veranstaltungsdatum (nächste zuerst)</option>
+              </select>
+            </label>
+          </div>
+          <div id="bookings-list" class="space-y-4">
+            <p class="text-paper-dim text-sm">Lädt …</p>
+          </div>
+
+          <details id="cleanup-details" class="admin-card rounded-md p-5 mt-10">
+            <summary class="cursor-pointer font-medium">Alte Anfragen aufräumen <span id="cleanup-count" class="badge badge-type"></span></summary>
+            <div class="mt-4">
+              <p class="text-paper-dim text-sm mb-4 max-w-2xl">
+                Unsere Datenschutzerklärung verspricht, erledigte Anfragen zu löschen. Hier seht ihr, welche erledigt
+                sind: <strong class="text-paper">abgesagte</strong> Anfragen, <strong class="text-paper">zugesagte, deren
+                Auftritt vorbei ist</strong>, und <strong class="text-paper">nie entschiedene</strong>, deren Datum
+                längst vorbei ist. Ihr wählt aus, was gelöscht wird. Termine unter „Termine“ bleiben erhalten.
+              </p>
+              <label class="text-xs text-paper-dim flex items-center gap-2 mb-4">
+                Erledigt seit mindestens
+                <select id="cleanup-age" class="rounded-sm px-3 py-2 text-sm bg-ink-2 border border-white/10 text-paper">
+                  <option value="0">heute (alle erledigten)</option>
+                  <option value="30" selected>30 Tagen</option>
+                  <option value="90">90 Tagen</option>
+                  <option value="180">6 Monaten</option>
+                  <option value="365">1 Jahr</option>
+                </select>
+              </label>
+              <div id="cleanup-list" class="restore-list"></div>
+              <label class="flex items-center gap-2 text-sm mt-4 cursor-pointer">
+                <input type="checkbox" id="cleanup-backup" checked />
+                Vorher die ausgewählten Anfragen als Sicherungsdatei herunterladen (empfohlen)
+              </label>
+              <div class="flex flex-wrap items-center gap-3 mt-4">
+                <button type="button" id="cleanup-select-all" class="btn-ghost text-sm px-4 py-2.5 rounded-sm">Alle auswählen / abwählen</button>
+                <button type="button" id="cleanup-delete" class="btn-admin-delete px-5" disabled>Ausgewählte löschen</button>
+                <span id="cleanup-status" class="text-xs text-paper-dim"></span>
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <!-- BEWERTUNGEN -->
+        <section class="admin-view" data-view-panel="bewertungen">
+          <h2 class="font-display text-lg text-gold mb-4">Wartet auf Freigabe</h2>
+          <div id="pending-reviews-list" class="space-y-4 mb-10">
+            <p class="text-paper-dim text-sm">Lädt …</p>
+          </div>
+
+          <h2 class="font-display text-lg text-paper-dim mb-4">Veröffentlicht</h2>
+          <div class="admin-search-wrap mb-5">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 5L20.49 19zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
+            <input type="search" id="published-search" class="admin-search" placeholder="Nach Name oder Text suchen …" />
+          </div>
+          <div id="published-reviews-list" class="space-y-4">
+            <p class="text-paper-dim text-sm">Lädt …</p>
+          </div>
+        </section>
+
+        <!-- TERMINE -->
+        <section class="admin-view" data-view-panel="termine">
+          <div class="flex items-start justify-between gap-4 flex-wrap mb-5">
+            <p class="text-paper-dim text-sm max-w-lg">
+              Erscheinen automatisch im Header-Hinweis und auf der
+              Termine-Seite der Homepage — je nach Datum automatisch als
+              „Kommend“ oder „Vergangen“ einsortiert.
+            </p>
+            <button type="button" id="import-shows-btn" class="btn-ghost text-xs px-3 py-2 rounded-sm shrink-0 whitespace-nowrap">
+              Bestehende Beispiel-Termine importieren
+            </button>
+          </div>
+
+          <form id="show-form" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6" novalidate>
+            <input type="date" id="show-date-input" required class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" />
+            <input type="text" id="show-venue-input" required placeholder="Location" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" />
+            <input type="text" id="show-city-input" placeholder="Ort (optional)" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" />
+            <input type="text" id="show-type-input" placeholder="Art, z. B. Live Gig" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" />
+            <button type="submit" class="btn-admin-approve shrink-0 px-5">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+              Termin hinzufügen
+            </button>
+          </form>
+
+          <div id="shows-list" class="space-y-3">
+            <p class="text-paper-dim text-sm">Lädt …</p>
+          </div>
+        </section>
+
+        <!-- SETLISTEN -->
+        <section class="admin-view" data-view-panel="setlisten">
+          <p class="text-paper-dim text-sm max-w-2xl mb-5">
+            Setlisten anlegen, Songs hinzufügen, per Ziehen (oder mit den
+            Pfeilen) umsortieren und Notizen eintragen. Änderungen werden
+            automatisch gespeichert. „PDF exportieren“ öffnet die fertige
+            Setliste im Bühnen-Design — dort „Als PDF speichern“ wählen.
+          </p>
+
+          <div class="setlist-layout">
+            <aside class="setlist-sidebar">
+              <button type="button" id="setlist-new-btn" class="btn-admin-approve w-full justify-center py-2.5 mb-3">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+                Neue Setliste
+              </button>
+              <div id="setlist-list" class="space-y-2">
+                <p class="text-paper-dim text-sm">Lädt …</p>
+              </div>
+            </aside>
+
+            <div id="setlist-editor" class="setlist-editor admin-card rounded-md">
+              <div class="empty-state">
+                <p class="text-sm">Links eine Setliste auswählen oder eine neue anlegen.</p>
+              </div>
+            </div>
+          </div>
+
+          <details id="repertoire-details" class="admin-card rounded-md mt-6">
+            <summary class="cursor-pointer select-none px-5 py-4 flex items-center justify-between gap-3">
+              <span>
+                <span class="font-display text-lg text-gold">Repertoire</span>
+                <span class="text-paper-dim text-sm ml-2">Alle Songs, die ihr spielt — erscheinen als Vorschläge beim Hinzufügen</span>
+              </span>
+              <span id="repertoire-count" class="badge badge-type">0</span>
+            </summary>
+            <div class="px-5 pb-5">
+              <form id="repertoire-form" class="flex flex-col sm:flex-row gap-3 mb-4" novalidate>
+                <input type="text" id="repertoire-title-input" required placeholder="Songtitel" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" />
+                <button type="submit" class="btn-admin-approve shrink-0 px-5">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+                  Zum Repertoire
+                </button>
+              </form>
+              <div id="repertoire-list" class="flex flex-wrap gap-2">
+                <p class="text-paper-dim text-sm">Lädt …</p>
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <!-- BAND -->
+        <section class="admin-view" data-view-panel="band">
+          <div class="flex items-start justify-between gap-4 flex-wrap mb-5">
+            <p class="text-paper-dim text-sm max-w-lg">
+              Name, Rolle, Text, Foto und Reihenfolge der Bandmitglieder auf
+              der Homepage. Sobald hier mindestens ein Mitglied steht,
+              ersetzt diese Liste die fest eingebauten Karten komplett.
+            </p>
+            <button type="button" id="import-band-btn" class="btn-ghost text-xs px-3 py-2 rounded-sm shrink-0 whitespace-nowrap">
+              Bestehende Mitglieder importieren
+            </button>
+          </div>
+
+          <div class="admin-hint mb-5">
+            <strong class="text-paper">Foto:</strong> Datei ins Repository legen
+            (<code class="text-gold">assets/img/band/</code>) und hier den Pfad eintragen,
+            z. B. <code class="text-gold">assets/img/band/tim.jpg</code> — oder eine
+            vollständige Web-Adresse (<code class="text-gold">https://…</code>). Ohne Foto
+            erscheinen die Initialen. <strong class="text-paper">Reihenfolge:</strong>
+            kleinste Zahl steht zuerst (1, 2, 3 …).
+          </div>
+
+          <form id="band-form" class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6" novalidate>
+            <input type="text" id="band-name-input" required placeholder="Name" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" />
+            <input type="text" id="band-role-input" placeholder="Rolle, z. B. Bass" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" />
+            <input type="number" id="band-order-input" min="1" placeholder="Reihenfolge" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" />
+            <input type="text" id="band-photo-input" placeholder="Foto-Pfad (optional)" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper" />
+            <textarea id="band-bio-input" rows="3" placeholder="Kurzer Text über das Mitglied" class="sm:col-span-4 w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper"></textarea>
+            <button type="submit" class="btn-admin-approve shrink-0 px-5 sm:col-span-4 sm:w-auto sm:justify-self-start">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+              Mitglied hinzufügen
+            </button>
+          </form>
+
+          <div id="band-admin-list" class="space-y-3">
+            <p class="text-paper-dim text-sm">Lädt …</p>
+          </div>
+        </section>
+
+        <!-- AUFTRITTSORTE -->
+        <section class="admin-view" data-view-panel="auftrittsorte">
+          <p class="text-paper-dim text-sm mb-5">
+            Erscheinen automatisch im Bereich „Schon aufgetreten bei" auf der
+            Homepage — hier hinzufügen oder entfernen, kein HTML nötig.
+          </p>
+
+          <form id="venue-form" class="flex flex-col sm:flex-row gap-3 mb-6" novalidate>
+            <input
+              type="text"
+              id="venue-name-input"
+              required
+              placeholder="Name der Location oder des Festivals"
+              class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper"
+            />
+            <button type="submit" class="btn-admin-approve shrink-0 px-5">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+              Hinzufügen
+            </button>
+          </form>
+
+          <div id="venues-list" class="flex flex-wrap gap-3">
+            <p class="text-paper-dim text-sm">Lädt …</p>
+          </div>
+        </section>
+
+        <!-- PLAYLIST -->
+        <section class="admin-view" data-view-panel="playlist">
+          <p class="text-paper-dim text-sm mb-5">
+            Titel erscheinen automatisch im Media-Player auf der Homepage.
+            <strong class="text-paper">Wichtig:</strong> Die MP3-Datei selbst
+            muss zusätzlich manuell unter <code class="text-gold">assets/audio/</code>
+            ins GitHub-Repository hochgeladen werden — der Admin-Bereich kann
+            auf einer GitHub-Pages-Seite keine Dateien hochladen, nur die
+            Titel-Liste verwalten. Der Dateiname hier muss exakt zum
+            hochgeladenen Dateinamen passen.
+          </p>
+
+          <form id="song-form" class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6" novalidate>
+            <input
+              type="text"
+              id="song-title-input"
+              required
+              placeholder="Songtitel"
+              class="sm:col-span-2 w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper"
+            />
+            <input
+              type="text"
+              id="song-duration-input"
+              placeholder="Dauer, z. B. 3:42"
+              class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper"
+            />
+            <input
+              type="text"
+              id="song-filename-input"
+              required
+              placeholder="Dateiname, z. B. 05-song.mp3"
+              class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper"
+            />
+            <button type="submit" class="btn-admin-approve shrink-0 px-5 sm:col-span-4 sm:w-auto sm:justify-self-start">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+              Song hinzufügen
+            </button>
+          </form>
+
+          <div id="songs-list" class="space-y-2">
+            <p class="text-paper-dim text-sm">Lädt …</p>
+          </div>
+        </section>
+
+        <!-- GALERIE & VIDEOS -->
+        <section class="admin-view" data-view-panel="medien">
+          <h2 class="font-display text-lg text-gold mb-4">Galeriebilder</h2>
+          <div class="admin-hint mb-5">
+            <strong class="text-paper">Wichtig zum Bild selbst:</strong> Eine
+            reine GitHub-Pages-Seite kann keine Datei-Uploads entgegennehmen.
+            Ihr habt zwei Möglichkeiten:
+            <br />• Bild ins Repository legen (<code class="text-gold">assets/img/gallery/</code>)
+            und hier nur den Pfad eintragen, z. B.
+            <code class="text-gold">assets/img/gallery/mein-foto.jpg</code>
+            <br />• Oder eine vollständige Web-Adresse eines bereits online
+            liegenden Bildes eintragen (beginnend mit <code class="text-gold">https://</code>)
+            <br />Bildunterschrift, Kachelgröße, Reihenfolge und Löschen
+            werden komplett hier verwaltet.
+          </div>
+
+          <form id="gallery-form" class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6" novalidate>
+            <input
+              type="text"
+              id="gallery-src-input"
+              required
+              placeholder="Pfad oder Bild-Adresse"
+              class="sm:col-span-2 w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper"
+            />
+            <input
+              type="text"
+              id="gallery-caption-input"
+              placeholder="Bildunterschrift"
+              class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper"
+            />
+            <select id="gallery-size-input" class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper">
+              <option value="normal">Normale Kachel</option>
+              <option value="hoch">Hochformat (doppelt hoch)</option>
+              <option value="breit">Breit (doppelt breit)</option>
+            </select>
+            <button type="submit" class="btn-admin-approve shrink-0 px-5 sm:col-span-4 sm:w-auto sm:justify-self-start">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+              Bild hinzufügen
+            </button>
+          </form>
+
+          <div id="gallery-admin-list" class="space-y-2 mb-12">
+            <p class="text-paper-dim text-sm">Lädt …</p>
+          </div>
+
+          <h2 class="font-display text-lg text-gold mb-4">Live-Videos</h2>
+          <div class="admin-hint mb-5">
+            Hier wird nur der YouTube-Link gespeichert — <strong class="text-paper">kein
+            Datei-Upload nötig</strong>, das funktioniert also vollständig über
+            diesen Bereich. Einfach den Link aus der Adresszeile kopieren
+            (youtube.com/watch?v=…, youtu.be/… oder Shorts-Links werden alle
+            erkannt). Der Video-Bereich auf der Homepage erscheint automatisch,
+            sobald hier mindestens ein Video steht.
+            <br /><strong class="text-paper">Datenschutz-Hinweis:</strong> Sobald
+            ihr ein Video einbindet, solltet ihr die Datenschutzerklärung um
+            YouTube ergänzen.
+          </div>
+
+          <form id="video-form" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6" novalidate>
+            <input
+              type="text"
+              id="video-url-input"
+              required
+              placeholder="YouTube-Link oder Video-ID"
+              class="sm:col-span-2 w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper"
+            />
+            <input
+              type="text"
+              id="video-title-input"
+              placeholder="Titel (optional)"
+              class="w-full rounded-sm px-4 py-3 text-sm bg-ink-2 border border-white/10 text-paper"
+            />
+            <button type="submit" class="btn-admin-approve shrink-0 px-5 sm:col-span-3 sm:w-auto sm:justify-self-start">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+              Video hinzufügen
+            </button>
+          </form>
+
+          <div id="videos-admin-list" class="space-y-2">
+            <p class="text-paper-dim text-sm">Lädt …</p>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- "Nach oben"-Button: im Admin-Bereich bewusst RECHTS unten (links
+       sitzt die Sidebar — dort würde der Button die Einträge "Zur Website"
+       und "Abmelden" überdecken). Auf der Homepage steht er dagegen links.
+       Klick scrollt sanft zum Seitenanfang (siehe initScrollToTop() in
+       admin.js). -->
+  <button
+    type="button"
+    id="scroll-top-btn"
+    class="scroll-top-btn fixed bottom-5 right-5 z-30 w-12 h-12 rounded-full flex items-center justify-center"
+    aria-label="Nach oben scrollen"
+  >
+    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 5l7 7-1.41 1.41L13 8.83V19h-2V8.83l-4.59 4.58L5 12z" />
+    </svg>
+  </button>
+
+  <script src="assets/js/admin.js"></script>
+  <script src="assets/js/setlist.js"></script>
+</body>
+</html>

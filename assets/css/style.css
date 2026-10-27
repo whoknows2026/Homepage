@@ -1,0 +1,2526 @@
+/* ==========================================================================
+   VOLTKREIS — Band-Website
+   Eigene Styles, die Tailwind (Utility-Klassen im HTML) ergänzen.
+   Enthält: Design-Tokens (CSS-Variablen), Typografie, Komponenten,
+   die sich schlecht als reine Utility-Klassen abbilden lassen, sowie
+   Animationen. Tailwind übernimmt Spacing/Grid/Responsive-Verhalten.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1) DESIGN-TOKENS
+   Hier zentral anpassen, wenn ihr Farben/Schriften der Band ändern wollt.
+   -------------------------------------------------------------------------- */
+:root {
+  /* Farben – abgeleitet vom Bandlogo: gealtertes Papier, Tinten-Schwarz,
+     Rost-/Siegel-Rot und gedämpftes Messing-Gold statt Neon-Bühnenlicht */
+  --color-ink: #14100c;        /* Tinten-Schwarz – Haupt-Hintergrund */
+  --color-ink-2: #1c1712;      /* etwas helleres Schwarz für Layer */
+  --color-charcoal: #241d16;   /* Karten-Hintergrund auf dunklem Grund */
+  --color-charcoal-2: #2c231a; /* Karten-Hintergrund, Variante */
+  --color-paper: #ece2cb;      /* gealtertes Papier für Text/helle Flächen */
+  --color-paper-dim: #c8bb9a;  /* gedämpftes Papier für Fließtext auf Dunkel */
+  --color-rust: #a8462b;       /* Siegel-Rot – Primärakzent / CTAs */
+  --color-rust-light: #c65f3f;
+  --color-gold: #c79a3e;       /* Messing-Gold – Sekundärakzent, Sterne */
+  --color-line: rgba(236, 226, 203, 0.12); /* dezente Trennlinien auf Dunkel */
+
+  /* Typografie */
+  --font-display: "Anton", "Arial Narrow", sans-serif; /* Plakat-Headlines */
+  --font-body: "Work Sans", "Segoe UI", sans-serif;     /* Fließtext/UI */
+
+  /* Sonstiges */
+  --radius-sm: 4px;
+  --radius-md: 10px;
+  --shadow-glow-rust: 0 0 60px rgba(168, 70, 43, 0.35);
+  --shadow-glow-gold: 0 0 50px rgba(199, 154, 62, 0.22);
+}
+
+/* --------------------------------------------------------------------------
+   2) GRUNDLAGEN
+   -------------------------------------------------------------------------- */
+/* Hinweis: "scroll-behavior: smooth" ist hier bewusst NICHT global gesetzt.
+   Global animiert der Browser sonst jeden Scroll-Vorgang (auch Pfeiltasten,
+   Bild-auf/-ab und in manchen Browsern das Mausrad), was sich träge und
+   "schwammig" anfühlt. Stattdessen wird sanftes Scrollen gezielt dort per
+   JavaScript ausgelöst, wo es gewünscht ist: bei Klick auf Anker-Links im
+   Menü und beim "Nach oben"-Button (siehe initSmoothAnchors() bzw.
+   initScrollToTop() in main.js). */
+
+/* Sorgt dafür, dass Ankerlinks (Nav -> #band, #reviews, ...) nicht unter dem
+   fixierten Header verschwinden. */
+section[id] {
+  /* --announcement-h wird von loadAnnouncement() (main.js) gesetzt, solange
+     der Ankündigungs-Banner sichtbar ist — sonst 0px. */
+  scroll-margin-top: calc(7.5rem + var(--announcement-h, 0px));
+}
+
+/* Hero-Abstand nach oben wächst mit dem Banner mit (ID-Selektor schlägt die
+   Tailwind-Klasse pt-32 im HTML). */
+#top {
+  padding-top: calc(8rem + var(--announcement-h, 0px));
+}
+
+/* Ankündigungs-Banner ganz oben in der fixierten Kopfzeile. Bewusst
+   kräftig in Rost-Rot, damit er sich klar vom (goldenen) "Nächster
+   Auftritt"-Streifen darunter unterscheidet. */
+.announcement-bar {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 0.55rem 2.75rem 0.55rem 1rem;
+  background: var(--color-rust);
+  color: var(--color-paper);
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.announcement-bar.is-visible {
+  display: flex;
+}
+.announcement-text {
+  margin: 0;
+}
+.announcement-close {
+  position: absolute;
+  right: 0.4rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2rem;
+  height: 2rem;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1.4rem;
+  line-height: 1;
+  opacity: 0.8;
+  cursor: pointer;
+}
+.announcement-close:hover,
+.announcement-close:focus-visible {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body {
+  background-color: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+/* sichtbarer Fokus-Ring für Tastaturbedienung (Barrierefreiheit) */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--color-rust);
+  color: var(--color-paper);
+}
+
+/* --------------------------------------------------------------------------
+   3) HERO – diagonaler "Bühnenlicht"-Verlauf statt generischem Radial-Glow
+   -------------------------------------------------------------------------- */
+.hero-beam {
+  background-color: var(--color-ink);
+}
+
+/* Abdunklungs-/Marken-Verlauf über dem Hero-Hintergrundfoto: unten (wo der
+   Text steht) fast deckend im Tinten-Schwarz, nach oben hin heller und mit
+   einem Hauch Siegel-Rot/Gold, damit ein echtes Foto genutzt werden kann,
+   ohne dass Kontrast oder Farbstimmung leiden. */
+.hero-overlay {
+  background:
+    linear-gradient(0deg, var(--color-ink) 0%, rgba(20, 16, 12, 0.86) 38%, rgba(20, 16, 12, 0.35) 75%, rgba(20, 16, 12, 0.55) 100%),
+    radial-gradient(circle at 85% 15%, rgba(168, 70, 43, 0.35), transparent 55%),
+    radial-gradient(circle at 10% 85%, rgba(199, 154, 62, 0.18), transparent 50%);
+}
+
+.hero-title {
+  font-family: var(--font-display);
+  line-height: 0.88;
+  letter-spacing: 0.005em;
+}
+
+/* Logo-Platzhalter: sobald ihr euer Logo als Datei habt, ersetzt einfach
+   das <img>-src in index.html (siehe Kommentar dort). Dieser Rahmen
+   dient nur als visueller Platzhalter, solange kein Logo vorhanden ist. */
+.logo-placeholder {
+  border: 1.5px dashed var(--color-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-paper-dim);
+}
+
+/* --------------------------------------------------------------------------
+   4) NAVIGATION
+   -------------------------------------------------------------------------- */
+.site-nav {
+  /* Deckender Hintergrund statt "backdrop-filter: blur()": Der Blur müsste
+     bei JEDEM Scroll-Pixel neu berechnet werden (die Leiste ist fixiert und
+     der Inhalt bewegt sich dahinter durch) — die häufigste Ursache für
+     ruckeliges, schwammiges Scrollen. Optisch ist der Unterschied bei
+     dieser Deckkraft minimal. */
+  background: rgba(14, 13, 16, 0.97);
+  border-bottom: 1px solid var(--color-line);
+}
+
+/* Nächster-Auftritt-Streifen ganz oben im Header (siehe initShows() in
+   main.js). Dezenter Verlauf in den Marken-Farben, damit er sich wie ein
+   Teil der Navigation anfühlt statt wie ein aufgesetztes Banner. */
+.next-show-bar {
+  background: linear-gradient(90deg, rgba(168, 70, 43, 0.35), rgba(199, 154, 62, 0.22));
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-paper);
+}
+.next-show-bar a {
+  color: inherit;
+}
+
+/* Countdown-Chip im Header-Streifen ("noch 12 Tage") — dezent abgesetzt,
+   damit er den Termin-Text ergänzt statt mit ihm zu konkurrieren. */
+.countdown-chip {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(20, 16, 12, 0.35);
+  border: 1px solid rgba(236, 226, 203, 0.18);
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Social-Media-Icons im Footer */
+.social-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-line);
+  color: var(--color-paper-dim);
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease,
+    background-color 0.15s ease;
+}
+.social-link--header {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+.social-link svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+.social-link:hover,
+.social-link:focus-visible {
+  color: var(--color-gold);
+  border-color: rgba(199, 154, 62, 0.45);
+  background: rgba(199, 154, 62, 0.08);
+  transform: translateY(-2px);
+}
+
+/* Icons in Ghost-/Primary-Buttons zuverlässig klein halten — greift auch
+   dann, wenn eine Tailwind-Größenklasse (w-3.5 o. Ä.) mal nicht anschlägt. */
+.btn-ghost svg,
+.btn-primary svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex-shrink: 0;
+}
+
+.nav-link {
+  position: relative;
+  color: var(--color-paper-dim);
+  transition: color 0.2s ease;
+}
+.nav-link:hover,
+.nav-link:focus-visible {
+  color: var(--color-paper);
+}
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  width: 0;
+  height: 2px;
+  background: var(--color-rust);
+  transition: width 0.25s ease;
+}
+.nav-link:hover::after,
+.nav-link:focus-visible::after {
+  width: 100%;
+}
+
+/* Burger-Icon Animation (drei Linien -> X) */
+.burger-line {
+  transition: transform 0.25s ease, opacity 0.2s ease;
+  transform-origin: center;
+}
+.burger-open .burger-line:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.burger-open .burger-line:nth-child(2) {
+  opacity: 0;
+}
+.burger-open .burger-line:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* --------------------------------------------------------------------------
+   5) BUTTONS
+   -------------------------------------------------------------------------- */
+.btn-primary {
+  background: var(--color-rust);
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.btn-primary:hover,
+.btn-primary:focus-visible {
+  background: var(--color-rust-light);
+  box-shadow: var(--shadow-glow-rust);
+  transform: translateY(-2px);
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-ghost {
+  border: 1.5px solid var(--color-line);
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.btn-ghost:hover,
+.btn-ghost:focus-visible {
+  border-color: var(--color-gold);
+  background: rgba(199, 154, 62, 0.08);
+}
+
+/* Schwebender Buchen-Button auf Mobilgeräten */
+.btn-float {
+  box-shadow: 0 8px 30px rgba(168, 70, 43, 0.45);
+}
+
+/* "Nach oben"-Button: dezentes, rundes Pendant zum Buchen-Button auf der
+   gegenüberliegenden Seite — bewusst zurückhaltender (kein knalliges
+   Rost-Rot), da es sich um eine Navigationshilfe und keine Handlungs-
+   aufforderung handelt. */
+.scroll-top-btn {
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+  color: var(--color-paper-dim);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.scroll-top-btn:hover,
+.scroll-top-btn:focus-visible {
+  color: var(--color-gold);
+  border-color: rgba(199, 154, 62, 0.45);
+  transform: translateY(-2px);
+}
+
+/* --------------------------------------------------------------------------
+   6) BAND-SEKTION
+   -------------------------------------------------------------------------- */
+.member-card {
+  background: linear-gradient(180deg, var(--color-charcoal) 0%, var(--color-charcoal-2) 100%);
+  border: 1px solid var(--color-line);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.member-card:hover {
+  border-color: rgba(199, 154, 62, 0.5);
+  transform: translateY(-4px);
+}
+
+/* Rollen-Tag – schräg gestellt, wie ein Aufnäher/Backstage-Pass statt
+   eines generischen Eyebrow-Labels */
+.role-tag {
+  display: inline-block;
+  transform: rotate(-2deg);
+  background: var(--color-rust);
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+.member-photo {
+  background: var(--color-ink-2);
+  border: 1px solid var(--color-line);
+}
+
+/* --------------------------------------------------------------------------
+   6b) TERMINE
+   -------------------------------------------------------------------------- */
+.show-row {
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+  transition: border-color 0.2s ease;
+}
+.show-row:hover {
+  border-color: rgba(199, 154, 62, 0.4);
+}
+.show-date {
+  color: var(--color-gold);
+  min-width: 9.5rem;
+}
+.show-type-badge {
+  background: rgba(199, 154, 62, 0.15);
+  color: var(--color-gold);
+  border: 1px solid rgba(199, 154, 62, 0.3);
+}
+
+/* Vergangene Auftritte etwas gedämpfter darstellen als kommende. */
+.show-row--past {
+  opacity: 0.65;
+}
+.show-row--past .show-date {
+  color: var(--color-paper-dim);
+}
+.show-row--past .show-type-badge {
+  background: rgba(236, 226, 203, 0.06);
+  color: var(--color-paper-dim);
+  border-color: var(--color-line);
+}
+
+/* --------------------------------------------------------------------------
+   7) REVIEWS
+   -------------------------------------------------------------------------- */
+.review-card {
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+  position: relative;
+}
+.review-card::before {
+  content: "\201E"; /* öffnendes deutsches Anführungszeichen */
+  font-family: var(--font-display);
+  font-size: 4rem;
+  line-height: 1;
+  color: rgba(168, 70, 43, 0.35);
+  position: absolute;
+  top: 0.25rem;
+  left: 0.75rem;
+}
+
+.stars {
+  color: var(--color-gold);
+  letter-spacing: 0.1em;
+}
+
+/* Öffentliche Antwort der Band unter einer Bewertung (Admin-Bereich unter
+   "Bewertungen" verfasst) — leicht eingerückt und farblich abgesetzt,
+   ähnlich wie Antworten auf Google-Rezensionen. */
+.review-reply {
+  margin-top: 0.85rem;
+  padding: 0.7rem 0.9rem;
+  border-left: 2px solid var(--color-gold);
+  background: rgba(199, 154, 62, 0.07);
+  border-radius: 0 4px 4px 0;
+}
+.review-reply-label {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  color: var(--color-gold);
+  margin-bottom: 0.25rem;
+}
+.review-reply-text {
+  font-size: 0.82rem;
+  color: var(--color-paper-dim);
+  line-height: 1.5;
+}
+
+/* Scrollbarer Bereich für weitere Bewertungen (siehe #review-scroll in
+   index.html) — dieselbe dezente, farblich passende Scrollbar wie beim
+   Media-Player und der Galerie, statt der Standard-Browser-Leiste. */
+.review-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-rust) var(--color-ink-2);
+}
+.review-scroll::-webkit-scrollbar {
+  width: 7px;
+}
+.review-scroll::-webkit-scrollbar-track {
+  background: var(--color-ink-2);
+}
+.review-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-rust);
+  border-radius: 4px;
+}
+
+.logo-strip img,
+.logo-strip .logo-placeholder {
+  filter: grayscale(1);
+  opacity: 0.6;
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+.logo-strip img:hover,
+.logo-strip .logo-placeholder:hover {
+  opacity: 1;
+  filter: grayscale(0);
+}
+
+/* Sterne-Auswahl im Bewertungsformular: fünf Radio-Buttons, visuell als
+   Sterne dargestellt, in umgekehrter Reihenfolge im Markup (5 zuerst),
+   damit die CSS-Geschwister-Selektoren "alle Sterne bis zur Auswahl
+   hervorheben" ohne JavaScript funktionieren. */
+.star-rating {
+  direction: rtl;
+  justify-content: flex-end;
+}
+.star-rating input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.star-rating label {
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--color-line);
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+.star-rating input:checked ~ label,
+.star-rating label:hover,
+.star-rating label:hover ~ label {
+  color: var(--color-gold);
+}
+.star-rating input:focus-visible + label {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Bewertung "wartet auf Freigabe" — nur im Admin-Bereich sichtbar */
+.review-pending {
+  opacity: 0.7;
+}
+.review-pending::after {
+  content: "Wartet auf Freigabe";
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+}
+
+/* --------------------------------------------------------------------------
+   7b) BILDERGALERIE
+   -------------------------------------------------------------------------- */
+/* Responsives 16:9-Video-Fenster (YouTube-Einbettung in der Galerie) */
+.video-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--color-ink-2);
+  border: 1px solid var(--color-line);
+}
+.video-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.gallery-item {
+  border: 1px solid var(--color-line);
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+.gallery-item:hover,
+.gallery-item:focus-visible {
+  border-color: rgba(199, 154, 62, 0.55);
+}
+.gallery-item:hover img {
+  transform: scale(1.04);
+}
+.gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.gallery-placeholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, var(--color-charcoal) 0%, var(--color-charcoal-2) 100%);
+  color: var(--color-paper-dim);
+}
+
+.lightbox-fallback {
+  color: var(--color-paper-dim);
+}
+
+/* --------------------------------------------------------------------------
+   8) AUDIO-PLAYER
+   -------------------------------------------------------------------------- */
+.player-panel {
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+}
+
+/* Playlist: normale vertikale Liste (siehe #track-list in index.html),
+   begrenzt auf eine feste Höhe mit eigenem, sichtbarem Scrollbalken in den
+   Marken-Farben — einfach von oben nach unten scrollen, um weitere Songs
+   zu sehen. */
+.track-list {
+  max-height: 14rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-rust) var(--color-ink-2);
+}
+.track-list::-webkit-scrollbar {
+  width: 7px;
+}
+.track-list::-webkit-scrollbar-track {
+  background: var(--color-ink-2);
+}
+.track-list::-webkit-scrollbar-thumb {
+  background: var(--color-rust);
+  border-radius: 4px;
+}
+
+.track-row {
+  border-bottom: 1px solid var(--color-line);
+  transition: background-color 0.15s ease;
+  cursor: pointer;
+}
+.track-row:last-child {
+  border-bottom: none;
+}
+.track-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.track-row[aria-current="true"] {
+  background: rgba(168, 70, 43, 0.14);
+}
+.track-row[aria-current="true"] .track-number {
+  color: var(--color-rust-light);
+}
+
+.track-number {
+  font-family: var(--font-display);
+  color: var(--color-paper-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Play/Pause-Button pulsiert dezent, während ein Track läuft */
+.play-btn.is-playing {
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(168, 70, 43, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 14px rgba(168, 70, 43, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(168, 70, 43, 0);
+  }
+}
+
+/* Fortschrittsbalken des Players */
+#progress-bar,
+#volume-bar {
+  accent-color: var(--color-rust);
+}
+
+/* --------------------------------------------------------------------------
+   9) FORMULARE (Kontakt + Buchungs-Modal)
+   -------------------------------------------------------------------------- */
+.form-field label {
+  color: var(--color-paper-dim);
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+  background: var(--color-ink-2);
+  border: 1px solid var(--color-line);
+  color: var(--color-paper);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 3px rgba(199, 154, 62, 0.15);
+  outline: none;
+}
+
+.form-field.has-error input,
+.form-field.has-error select,
+.form-field.has-error textarea {
+  border-color: var(--color-rust);
+}
+.form-field .error-message {
+  display: none;
+  color: var(--color-rust-light);
+}
+.form-field.has-error .error-message {
+  display: block;
+}
+
+/* Modal */
+.modal-backdrop {
+  background: rgba(6, 5, 7, 0.75);
+  backdrop-filter: blur(4px);
+}
+
+.modal-panel {
+  background: var(--color-ink-2);
+  border: 1px solid var(--color-line);
+}
+
+/* Rechtliches-Modal: Inhalt kommt als reines HTML aus LEGAL_CONTENT in
+   main.js (Impressum/Datenschutz/AGB) — hier nur die Typografie dafür. */
+.legal-content h3 {
+  font-family: var(--font-display);
+  color: var(--color-paper);
+  font-size: 1.1rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+.legal-content h3:first-child {
+  margin-top: 0;
+}
+.legal-content p {
+  margin-bottom: 0.75rem;
+}
+.legal-content a {
+  color: var(--color-gold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.legal-content .legal-stand {
+  margin-top: 2rem;
+  font-size: 0.8rem;
+  color: var(--color-paper-dim);
+  opacity: 0.8;
+}
+.legal-callout {
+  background: rgba(168, 70, 43, 0.14);
+  border: 1px solid rgba(168, 70, 43, 0.4);
+  color: var(--color-paper);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  font-size: 0.8rem;
+  margin-bottom: 1.25rem;
+}
+
+/* Honeypot-Feld gegen einfache Spam-Bots (siehe #review-website in
+   index.html): für Menschen unsichtbar und aus Tab-Reihenfolge sowie
+   Screenreadern ausgeschlossen (zusätzlich zu aria-hidden auf dem
+   Wrapper). Bewusst nicht "display: none" o. Ä., da manche simplen Bots
+   genau danach filtern, um Honeypots zu erkennen. */
+.honeypot-field {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* "Ich bin kein Roboter"-Bestätigung im Bewertungsformular: eigens
+   gestylte Checkbox im Look eines kleinen Stempel-Kästchens, passend zum
+   restlichen Vintage-Look (siehe .star-rating für dasselbe Prinzip). */
+.robot-check-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 1.1rem;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  background: var(--color-ink-2);
+  color: var(--color-paper-dim);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.robot-check-wrapper:hover {
+  border-color: rgba(199, 154, 62, 0.45);
+}
+.robot-check-wrapper input[type="checkbox"] {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--color-rust);
+  cursor: pointer;
+}
+.robot-check-wrapper input[type="checkbox"]:checked ~ span {
+  color: var(--color-paper);
+}
+.robot-check-wrapper input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+}
+.form-field.has-error .robot-check-wrapper {
+  border-color: var(--color-rust);
+}
+
+/* --------------------------------------------------------------------------
+   9b) ADMIN-DASHBOARD (admin.html / admin.js)
+   --------------------------------------------------------------------------
+   Sidebar-Layout: fest stehende Navigation links (Desktop) bzw. horizontale
+   Tab-Leiste oben (Mobil), rechts der eigentliche Dashboard-Inhalt. Nur ein
+   "View" (Bereich) ist gleichzeitig sichtbar — Umschalten übernimmt
+   initAdminNav() in admin.js. */
+.admin-shell {
+  display: flex;
+  min-height: 100vh;
+  align-items: stretch;
+}
+
+.admin-sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-ink-2);
+  border-right: 1px solid var(--color-line);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.admin-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 1.25rem 1.1rem;
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-paper);
+  text-decoration: none;
+}
+
+.admin-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.85rem 0.75rem;
+}
+
+.admin-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--color-paper-dim);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.admin-nav-item svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+}
+.admin-nav-item .nav-label {
+  flex: 1;
+  min-width: 0;
+}
+.admin-nav-item:hover {
+  background: rgba(236, 226, 203, 0.05);
+  color: var(--color-paper);
+}
+.admin-nav-item.active {
+  background: rgba(199, 154, 62, 0.12);
+  color: var(--color-gold);
+}
+
+.nav-badge {
+  flex-shrink: 0;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--color-rust);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-sidebar-footer {
+  padding: 0.75rem;
+  border-top: 1px solid var(--color-line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.admin-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  /* Deckend statt geblurrt — gleicher Grund wie bei .site-nav oben:
+     backdrop-filter auf einer beim Scrollen stehenbleibenden Leiste
+     kostet spürbar Performance. */
+  background: rgb(20, 16, 12);
+  border-bottom: 1px solid var(--color-line);
+  padding: 1.1rem 1.5rem;
+}
+
+.admin-views {
+  padding: 1.5rem;
+}
+
+.admin-view {
+  display: none;
+}
+.admin-view.active {
+  display: block;
+}
+
+/* Statistik-Kacheln, die zugleich als Navigations-Shortcut dienen
+   (data-view Attribut, siehe initAdminNav in admin.js). */
+.admin-nav-link {
+  cursor: pointer;
+}
+
+/* Mobil: Sidebar wird zur horizontalen, scrollbaren Tab-Leiste oben. */
+@media (max-width: 1023px) {
+  .admin-shell {
+    flex-direction: column;
+  }
+  .admin-sidebar {
+    width: 100%;
+    height: auto;
+    position: sticky;
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: none;
+    border-bottom: 1px solid var(--color-line);
+    z-index: 20;
+  }
+  .admin-sidebar-brand {
+    border-bottom: none;
+    border-right: 1px solid var(--color-line);
+    padding: 0.75rem 1rem;
+  }
+  .admin-sidebar-brand-text {
+    display: none;
+  }
+  .admin-nav {
+    flex-direction: row;
+    padding: 0.5rem;
+  }
+  .admin-nav-item {
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.65rem;
+    white-space: nowrap;
+  }
+  .admin-nav-item .nav-label {
+    flex: none;
+  }
+  .nav-badge {
+    position: absolute;
+    top: 0.1rem;
+    right: 0.35rem;
+  }
+  .admin-sidebar-footer {
+    flex-direction: row;
+    border-top: none;
+    border-left: 1px solid var(--color-line);
+  }
+  .admin-sidebar-footer .nav-label {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Feld-Grid für Buchungsanfragen: jedes Feld (Label + Wert) ist ein eigener
+   Block, der als Ganzes im Grid sitzt. Dadurch bleiben Bezeichnung und Wert
+   immer zusammen und in der richtigen Reihenfolge — unabhängig davon, wie
+   viele Spalten (mobil/desktop) gerade angezeigt werden. */
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.5rem 1.5rem;
+}
+.field-block dt {
+  color: var(--color-paper-dim);
+  opacity: 0.7;
+}
+.field-block dd {
+  margin: 0;
+}
+
+/* Echte Aktions-Buttons im Admin-Dashboard statt einfacher Text-Links —
+   Löschen (Rost, zurückhaltend) und Freigeben (Gold, positiv) klar
+   unterscheidbar und eindeutig als Aktion erkennbar. */
+.btn-admin-delete,
+.btn-admin-approve {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.375rem 0.75rem;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-admin-delete {
+  color: var(--color-rust-light);
+  border-color: rgba(168, 70, 43, 0.4);
+  background: rgba(168, 70, 43, 0.08);
+}
+.btn-admin-delete:hover,
+.btn-admin-delete:focus-visible {
+  background: rgba(168, 70, 43, 0.22);
+  border-color: var(--color-rust-light);
+}
+
+.btn-admin-approve {
+  color: var(--color-gold);
+  border-color: rgba(199, 154, 62, 0.4);
+  background: rgba(199, 154, 62, 0.1);
+}
+.btn-admin-approve:hover,
+.btn-admin-approve:focus-visible {
+  background: rgba(199, 154, 62, 0.22);
+  border-color: var(--color-gold);
+}
+
+/* Stat-Karten mit Icon-Medaillon oben rechts. */
+.stat-card {
+  display: block;
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+  position: relative;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.stat-card:hover,
+.stat-card:focus-visible {
+  border-color: rgba(199, 154, 62, 0.4);
+  transform: translateY(-2px);
+}
+.stat-card-icon {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: rgba(199, 154, 62, 0.12);
+  color: var(--color-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Such-/Filterfeld über den Listen. */
+.admin-search {
+  width: 100%;
+  background: var(--color-ink-2);
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem 0.6rem 2.25rem;
+  font-size: 0.875rem;
+  color: var(--color-paper);
+}
+.admin-search:focus {
+  outline: none;
+  border-color: rgba(199, 154, 62, 0.5);
+}
+.admin-search-wrap {
+  position: relative;
+}
+.admin-search-wrap svg {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  color: var(--color-paper-dim);
+  pointer-events: none;
+}
+
+/* Runde Initialen-Kachel als kleines "Avatar" — schafft sofort visuelle
+   Anhaltspunkte in einer Liste aus sonst recht gleichförmigen Text-Karten. */
+.avatar-circle {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--color-rust), var(--color-gold));
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Kalender-Chip fürs Veranstaltungsdatum — deutlich prominenter als ein
+   Text-Feld unter vielen, da das Datum meist die wichtigste Info ist. */
+.date-chip {
+  flex-shrink: 0;
+  width: 3.75rem;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  text-align: center;
+}
+/* Beschriftung über dem Kalender-Feld in Buchungsanfragen: macht klar, dass
+   das Datum die geplante VERANSTALTUNG meint — nicht den Eingang der Anfrage
+   (der steht als "Anfrage eingegangen am …" oben in der Karte). */
+.date-chip-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+.date-chip-caption {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-paper-dim);
+}
+.date-chip-month {
+  display: block;
+  background: var(--color-rust);
+  color: var(--color-paper);
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0;
+}
+.date-chip-day {
+  display: block;
+  background: var(--color-ink-2);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  padding: 0.2rem 0 0;
+}
+.date-chip-year {
+  display: block;
+  background: var(--color-ink-2);
+  color: var(--color-paper-dim);
+  font-size: 0.6rem;
+  letter-spacing: 0.02em;
+  padding: 0 0 0.2rem;
+}
+
+/* Badges: Veranstaltungsart, "Neu"-Kennzeichen. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.badge-type {
+  background: rgba(236, 226, 203, 0.08);
+  color: var(--color-paper-dim);
+  border: 1px solid var(--color-line);
+}
+.badge-new {
+  background: var(--color-gold);
+  color: var(--color-ink);
+}
+
+/* Zeilen mit Icon + Label + Wert, für Kontaktdaten/Details. */
+.info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--color-paper);
+  min-width: 0;
+}
+.info-row svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--color-gold);
+  opacity: 0.8;
+}
+.info-row a {
+  color: var(--color-paper);
+  text-decoration: underline;
+  text-decoration-color: var(--color-line);
+  text-underline-offset: 2px;
+}
+.info-row a:hover {
+  color: var(--color-gold);
+}
+.info-row .info-label {
+  color: var(--color-paper-dim);
+  margin-right: 0.3rem;
+}
+
+/* Zitat-artige Box für Nachrichtentexte/Kommentare — hebt Freitext optisch
+   vom strukturierten Datenblock ab. */
+.quote-box {
+  background: var(--color-ink-2);
+  border-left: 2px solid var(--color-rust);
+  border-radius: 0 6px 6px 0;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.85rem;
+  color: var(--color-paper-dim);
+  font-style: italic;
+}
+
+/* Leerer Zustand (keine Einträge) mit dezentem Icon. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2.5rem 1rem;
+  color: var(--color-paper-dim);
+  text-align: center;
+}
+.empty-state svg {
+  width: 2rem;
+  height: 2rem;
+  opacity: 0.4;
+}
+
+.admin-card {
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+  transition: border-color 0.15s ease;
+}
+.admin-card:hover {
+  border-color: rgba(236, 226, 203, 0.2);
+}
+
+/* Fußzeile jeder Buchungsanfrage: Status-Auswahl + Notiz-Button */
+.booking-footer {
+  border-top: 1px solid var(--color-line);
+}
+
+/* Status-Auswahl als farbige "Pille": die Farbe spiegelt den aktuellen
+   Bearbeitungsstand wider (gesetzt über das data-value-Attribut in
+   admin.js), damit man in einer langen Liste sofort sieht, wo noch
+   etwas zu tun ist. */
+.status-select {
+  appearance: none;
+  -webkit-appearance: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35rem 1.75rem 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-line);
+  background-color: var(--color-ink-2);
+  color: var(--color-paper);
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23c8bb9a'><path d='M7 10l5 5 5-5z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.4rem center;
+  background-size: 1rem;
+}
+.status-select[data-value="neu"] {
+  color: var(--color-gold);
+  border-color: rgba(199, 154, 62, 0.5);
+  background-color: rgba(199, 154, 62, 0.12);
+}
+.status-select[data-value="bearbeitung"] {
+  color: var(--color-paper);
+  border-color: rgba(236, 226, 203, 0.35);
+  background-color: rgba(236, 226, 203, 0.08);
+}
+.status-select[data-value="zugesagt"] {
+  color: #9bbf7a;
+  border-color: rgba(155, 191, 122, 0.5);
+  background-color: rgba(155, 191, 122, 0.12);
+}
+.status-select[data-value="abgesagt"] {
+  color: var(--color-rust-light);
+  border-color: rgba(168, 70, 43, 0.5);
+  background-color: rgba(168, 70, 43, 0.12);
+}
+.status-select option {
+  background: var(--color-ink-2);
+  color: var(--color-paper);
+}
+
+/* Hinweisbox im Admin-Bereich (z. B. Erklärung zum Bild-Upload) */
+.admin-hint {
+  background: rgba(199, 154, 62, 0.08);
+  border: 1px solid rgba(199, 154, 62, 0.25);
+  border-radius: 6px;
+  padding: 0.85rem 1rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--color-paper-dim);
+}
+
+/* Kleines Vorschaubild in den Medien-Listen (Galerie/Videos) */
+.media-thumb {
+  width: 3.5rem;
+  height: 2.5rem;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--color-ink-2);
+  border: 1px solid var(--color-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.media-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* Wenn das Bild nicht geladen werden kann (falscher Pfad o. Ä.) */
+.media-thumb--missing {
+  border-color: rgba(168, 70, 43, 0.5);
+  position: relative;
+}
+.media-thumb--missing::after {
+  content: "?";
+  font-family: var(--font-display);
+  color: var(--color-rust-light);
+  font-size: 1rem;
+}
+
+/* --------------------------------------------------------------------------
+   9c) LADEBILDSCHIRM (Preloader)
+   --------------------------------------------------------------------------
+   Eigenständiger Vollbild-Screen, der die komplette Seite (inkl. Header)
+   verdeckt, bis main.js ihn nach 2 Sekunden ausblendet. Ruhiger, dezenter
+   Verlauf in den Marken-Farben statt eines flachen Einheitstons; das
+   Wasserzeichen-Logo "atmet" leicht (Opacity-Puls), der Ladebalken darunter
+   ist die einzige explizite Fortschrittsanzeige — bewusst ohne
+   Prozentzahl, wie gewünscht.
+   -------------------------------------------------------------------------- */
+.preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(168, 70, 43, 0.16), transparent 55%),
+    radial-gradient(circle at 80% 80%, rgba(199, 154, 62, 0.12), transparent 55%),
+    var(--color-ink);
+  transition: opacity 0.5s ease;
+}
+.preloader.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.preloader-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(60vw, 420px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(199, 154, 62, 0.22), transparent 70%);
+  animation: preloader-breathe 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.preloader-logo {
+  position: relative;
+  width: clamp(140px, 32vw, 210px);
+  height: auto;
+  animation: preloader-logo-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes preloader-breathe {
+  0%, 100% {
+    opacity: 0.85;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.04);
+  }
+}
+
+@keyframes preloader-logo-breathe {
+  0%, 100% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+}
+
+.preloader-bar-track {
+  position: relative;
+  width: min(60vw, 220px);
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-ink-2);
+  overflow: hidden;
+}
+.preloader-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-rust), var(--color-gold));
+}
+
+/* --------------------------------------------------------------------------
+   10) EINBLEND-ANIMATION BEIM LADEN (ein einziger orchestrierter Moment,
+   nicht auf jeder Sektion wiederholt)
+   -------------------------------------------------------------------------- */
+.hero-in {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: hero-reveal 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.hero-in.delay-1 { animation-delay: 0.1s; }
+.hero-in.delay-2 { animation-delay: 0.2s; }
+.hero-in.delay-3 { animation-delay: 0.3s; }
+.hero-in.delay-4 { animation-delay: 0.4s; }
+
+@keyframes hero-reveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Sektionen, die beim Scrollen ins Bild kommen, erhalten die Klasse
+   "in-view" per JS (IntersectionObserver) – siehe main.js */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* --------------------------------------------------------------------------
+   11) TOAST (Erfolgsmeldung nach Formular-Versand)
+   -------------------------------------------------------------------------- */
+.toast {
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-gold);
+  transform: translateY(120%);
+  /* Zusätzlich zur Verschiebung nach unten komplett unsichtbar/nicht
+     interaktiv machen — verhindert zuverlässig, dass der Rahmen der
+     leeren Box (z. B. bei sehr kurzer Höhe ohne Text) am Bildschirmrand
+     durchschimmert, unabhängig von Rundungsfehlern beim Transform. */
+  opacity: 0;
+  visibility: hidden;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease,
+    visibility 0s linear 0.35s;
+}
+.toast.is-visible {
+  transform: translateY(0);
+  opacity: 1;
+  visibility: visible;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease,
+    visibility 0s linear 0s;
+}
+
+/* --------------------------------------------------------------------------
+   19) PLAYER-EXTRAS: EQUALIZER + MINI-PLAYER
+   -------------------------------------------------------------------------- */
+/* Das HTML-Attribut "hidden" soll immer gewinnen — auch gegen Klassen, die
+   ein display setzen (wird von Formular-Schritten und Mini-Player genutzt). */
+[hidden] {
+  display: none !important;
+}
+
+/* Equalizer: vier Balken, die nur über transform animiert werden (läuft auf
+   der Grafikkarte, belastet das Scrollen nicht). Stehen still und niedrig,
+   solange nichts spielt; tanzen, sobald <body> die Klasse is-audio-playing
+   trägt (setzt initAudioPlayer in main.js). */
+.eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  width: 16px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.eq i {
+  display: block;
+  flex: 1;
+  height: 100%;
+  background: var(--color-gold);
+  border-radius: 1px;
+  transform: scaleY(0.25);
+  transform-origin: bottom;
+}
+.is-audio-playing .eq i {
+  animation: eq-bounce 0.9s ease-in-out infinite;
+}
+.is-audio-playing .eq i:nth-child(1) { animation-duration: 0.85s; }
+.is-audio-playing .eq i:nth-child(2) { animation-duration: 1.1s; animation-delay: -0.3s; }
+.is-audio-playing .eq i:nth-child(3) { animation-duration: 0.75s; animation-delay: -0.5s; }
+.is-audio-playing .eq i:nth-child(4) { animation-duration: 1s; animation-delay: -0.15s; }
+@keyframes eq-bounce {
+  0%, 100% { transform: scaleY(0.2); }
+  50% { transform: scaleY(1); }
+}
+
+/* Im Player-Kopf nur zeigen, sobald ein Song gewählt wurde */
+.now-eq {
+  display: none;
+}
+.has-track .now-eq {
+  display: inline-flex;
+}
+
+/* In der Songliste ersetzt der Equalizer bei der aktuellen Zeile die Nummer */
+.track-row .eq {
+  display: none;
+  margin-right: 4px;
+}
+.track-row[aria-current="true"] .eq {
+  display: inline-flex;
+}
+.track-row[aria-current="true"] .track-number {
+  display: none;
+}
+
+/* Mini-Player: schwebende Leiste unten in der Mitte. Auf dem Handy etwas
+   höher, damit sie nicht die runden Buttons ("Nach oben", "Buchen")
+   überdeckt. */
+.mini-player {
+  position: fixed;
+  left: 50%;
+  bottom: 5.75rem;
+  z-index: 35;
+  width: min(26rem, calc(100vw - 2rem));
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem 0.65rem;
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+  border-radius: 1rem;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  transform: translate(-50%, 160%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+}
+.mini-player.is-visible {
+  transform: translate(-50%, 0);
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (min-width: 768px) {
+  .mini-player {
+    bottom: 1.25rem;
+  }
+}
+.mini-btn {
+  background: transparent;
+  border: 0;
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-paper-dim);
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.mini-btn svg {
+  width: 1rem;
+  height: 1rem;
+}
+.mini-btn:hover,
+.mini-btn:focus-visible {
+  color: var(--color-paper);
+  background: rgba(236, 226, 203, 0.08);
+}
+.mini-btn--play {
+  width: 2.25rem;
+  height: 2.25rem;
+  background: var(--color-rust);
+  color: var(--color-paper);
+}
+.mini-btn--play:hover,
+.mini-btn--play:focus-visible {
+  background: var(--color-rust-light);
+}
+.mini-title {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  color: var(--color-paper);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mini-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(236, 226, 203, 0.1);
+}
+.mini-progress span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-rust), var(--color-gold));
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+/* --------------------------------------------------------------------------
+   20) BUCHUNGSFORMULAR IN SCHRITTEN + KALENDER
+   -------------------------------------------------------------------------- */
+.booking-progress {
+  margin-bottom: 1.5rem;
+}
+.booking-steps {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+.booking-steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--color-paper-dim);
+}
+.booking-steps .num {
+  width: 1.6rem;
+  height: 1.6rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--color-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+.booking-steps li.is-active {
+  color: var(--color-paper);
+}
+.booking-steps li.is-active .num {
+  background: var(--color-rust);
+  border-color: var(--color-rust);
+  color: #fff;
+}
+.booking-steps li.is-done .num {
+  background: rgba(199, 154, 62, 0.18);
+  border-color: var(--color-gold);
+  color: var(--color-gold);
+}
+.booking-bar {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(236, 226, 203, 0.1);
+  overflow: hidden;
+}
+.booking-bar-fill {
+  height: 100%;
+  width: 33.333%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-rust), var(--color-gold));
+  transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.booking-step {
+  animation: booking-step-in 0.3s ease both;
+}
+@keyframes booking-step-in {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: none; }
+}
+.booking-summary {
+  font-size: 0.85rem;
+  color: var(--color-gold);
+  background: rgba(199, 154, 62, 0.08);
+  border: 1px solid rgba(199, 154, 62, 0.25);
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+}
+.booking-summary:empty {
+  display: none;
+}
+
+/* Kalender */
+.cal {
+  background: var(--color-ink-2);
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  padding: 0.75rem;
+}
+.form-field.has-error .cal {
+  border-color: var(--color-rust);
+}
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+.cal-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+.cal-nav {
+  background: transparent;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-line);
+  color: var(--color-paper-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.cal-nav svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.cal-nav:hover:not(:disabled),
+.cal-nav:focus-visible {
+  color: var(--color-gold);
+  border-color: rgba(199, 154, 62, 0.45);
+}
+.cal-nav:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.cal-dow {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-paper-dim);
+  text-align: center;
+  padding: 0.25rem 0;
+}
+.cal-day {
+  min-height: 2.4rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-paper);
+  font-size: 0.85rem;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.cal-day:hover:not([aria-disabled="true"]) {
+  background: rgba(199, 154, 62, 0.12);
+  border-color: rgba(199, 154, 62, 0.4);
+}
+.cal-day[aria-disabled="true"] {
+  color: rgba(236, 226, 203, 0.28);
+  cursor: not-allowed;
+}
+.cal-day.is-taken {
+  color: rgba(236, 226, 203, 0.5);
+  text-decoration: line-through;
+  background: repeating-linear-gradient(135deg, rgba(168, 70, 43, 0.22) 0 4px, transparent 4px 8px);
+}
+.cal-day.is-today {
+  border-color: var(--color-line);
+}
+.cal-day.is-selected {
+  background: var(--color-rust);
+  border-color: var(--color-rust);
+  color: #fff;
+  font-weight: 700;
+}
+.cal-day:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 1px;
+}
+.cal-foot {
+  margin-top: 0.6rem;
+}
+.cal-selected {
+  font-size: 0.85rem;
+  color: var(--color-paper);
+  margin: 0;
+}
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0.4rem 0 0;
+  font-size: 0.7rem;
+  color: var(--color-paper-dim);
+}
+.cal-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.cal-key {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 3px;
+}
+.cal-key--sel {
+  background: var(--color-rust);
+}
+.cal-key--taken {
+  background: repeating-linear-gradient(135deg, rgba(168, 70, 43, 0.5) 0 3px, transparent 3px 6px);
+  border: 1px solid rgba(168, 70, 43, 0.5);
+}
+
+/* --------------------------------------------------------------------------
+   21) ADMIN-KALENDER (Auftritte, Anfragen, Sperren)
+   -------------------------------------------------------------------------- */
+.acal-layout {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1024px) {
+  .acal-layout {
+    grid-template-columns: minmax(0, 1fr) 20rem;
+  }
+}
+.acal {
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  padding: 1rem;
+}
+.acal-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.acal-title {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+}
+.acal-grid {
+  display: grid;
+  grid-template-columns: 2.6rem repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+.acal-dow {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-paper-dim);
+  text-align: center;
+  padding: 0.25rem 0;
+}
+.acal-week {
+  background: transparent;
+  border: 1px dashed var(--color-line);
+  border-radius: 4px;
+  font-size: 0.6rem;
+  color: var(--color-paper-dim);
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.acal-week:hover,
+.acal-week:focus-visible {
+  color: var(--color-gold);
+  border-color: rgba(199, 154, 62, 0.5);
+}
+.acal-week.is-blocked {
+  color: #f3d9cf;
+  border-style: solid;
+  border-color: rgba(168, 70, 43, 0.6);
+  background: rgba(168, 70, 43, 0.25);
+}
+.acal-day {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 3.4rem;
+  padding: 0.25rem;
+  overflow: hidden;
+  text-align: left;
+  color: var(--color-paper);
+  background: var(--color-ink-2);
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  transition: border-color 0.12s ease;
+}
+@media (min-width: 640px) {
+  .acal-day {
+    min-height: 5rem;
+  }
+}
+.acal-day:hover {
+  border-color: rgba(199, 154, 62, 0.45);
+}
+.acal-day.is-other {
+  opacity: 0.4;
+}
+.acal-day.is-past .acal-num {
+  color: var(--color-paper-dim);
+}
+.acal-day.is-today .acal-num {
+  color: var(--color-gold);
+  font-weight: 700;
+}
+.acal-day.is-selected {
+  outline: 2px solid var(--color-gold);
+  outline-offset: -1px;
+}
+.acal-day.is-blocked {
+  background: repeating-linear-gradient(135deg, rgba(168, 70, 43, 0.3) 0 5px, transparent 5px 10px), var(--color-ink-2);
+}
+.acal-num {
+  font-size: 0.8rem;
+}
+.acal-tag {
+  display: none;
+  max-width: 100%;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (min-width: 640px) {
+  .acal-tag {
+    display: block;
+  }
+  .acal-day .acal-dot--show {
+    display: none;
+  }
+}
+.acal-tag--show {
+  background: rgba(199, 154, 62, 0.22);
+  color: var(--color-gold);
+}
+.acal-tag--blocked {
+  background: rgba(168, 70, 43, 0.4);
+  color: #f3d9cf;
+}
+.acal-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: auto;
+}
+.acal-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+.acal-dot--show {
+  background: var(--color-gold);
+  border-radius: 2px;
+}
+.acal-dot--neu {
+  background: transparent;
+  border: 2px solid var(--color-gold);
+}
+.acal-dot--bearbeitung {
+  background: var(--color-paper);
+}
+.acal-dot--zugesagt {
+  background: #9bbf7a;
+}
+.acal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.7rem;
+  color: var(--color-paper-dim);
+}
+.acal-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.acal-key-blocked {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 3px;
+  border: 1px solid rgba(168, 70, 43, 0.6);
+  background: repeating-linear-gradient(135deg, rgba(168, 70, 43, 0.5) 0 3px, transparent 3px 6px);
+}
+.acal-list {
+  margin: 0 0 0.25rem;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+.acal-list li {
+  padding: 0.25rem 0;
+}
+
+/* --------------------------------------------------------------------------
+   22) ANFRAGEN: FILTER, WARNUNGEN, ANTWORT-VORLAGEN
+   -------------------------------------------------------------------------- */
+.filter-chip {
+  background: transparent;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.78rem;
+  color: var(--color-paper-dim);
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.filter-chip:hover,
+.filter-chip:focus-visible {
+  color: var(--color-paper);
+  border-color: rgba(199, 154, 62, 0.45);
+}
+.filter-chip.is-active {
+  color: var(--color-gold);
+  border-color: rgba(199, 154, 62, 0.6);
+  background: rgba(199, 154, 62, 0.12);
+}
+.filter-count {
+  margin-left: 0.25rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+.booking-warn:empty {
+  display: none;
+}
+.booking-warn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.booking-warn-item {
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+}
+.booking-warn-item--warn {
+  color: #f3d9cf;
+  background: rgba(168, 70, 43, 0.28);
+  border: 1px solid rgba(168, 70, 43, 0.6);
+}
+.booking-warn-item--info {
+  color: var(--color-paper-dim);
+  background: rgba(236, 226, 203, 0.06);
+  border: 1px solid var(--color-line);
+}
+.booking-mail {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+.booking-flash:empty {
+  display: none;
+}
+.booking-flash {
+  color: var(--color-gold);
+}
+
+/* --------------------------------------------------------------------------
+   23) FAQ (Startseite) + VERLAUFS-DIAGRAMM (Admin)
+   -------------------------------------------------------------------------- */
+.faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.faq-item {
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  transition: border-color 0.15s ease;
+}
+.faq-item[open] {
+  border-color: rgba(199, 154, 62, 0.4);
+}
+.faq-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  cursor: pointer;
+  list-style: none;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+}
+.faq-item summary::-webkit-details-marker {
+  display: none;
+}
+.faq-item summary::after {
+  content: "+";
+  flex-shrink: 0;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--color-gold);
+  transition: transform 0.2s ease;
+}
+.faq-item[open] summary::after {
+  transform: rotate(45deg);
+}
+.faq-item summary:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.faq-answer {
+  padding: 0 1.1rem 1.1rem;
+  color: var(--color-paper-dim);
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+.faq-answer p {
+  margin: 0 0 0.6rem;
+}
+.faq-answer p:last-child {
+  margin-bottom: 0;
+}
+
+.stats-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 7rem;
+}
+.stats-bar {
+  flex: 1;
+  min-width: 0;
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(180deg, var(--color-gold), var(--color-rust));
+}
+.stats-bar.is-empty {
+  background: rgba(236, 226, 203, 0.12);
+}
+.stats-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.4rem;
+  font-size: 0.65rem;
+  color: var(--color-paper-dim);
+}
+
+/* --------------------------------------------------------------------------
+   24) DATENSICHERUNG EINSPIELEN
+   -------------------------------------------------------------------------- */
+.restore-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.restore-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.restore-row .badge {
+  margin-left: auto;
+}
+.btn-admin-delete:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------------------
+   25) HEUTE ZU TUN, HINWEIS-MELDUNG, ANFRAGE-WERKZEUGE
+   -------------------------------------------------------------------------- */
+.today-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.today-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  color: var(--color-paper);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.today-item:hover,
+.today-item:focus-visible {
+  border-color: rgba(199, 154, 62, 0.5);
+}
+.today-item--warn {
+  background: rgba(168, 70, 43, 0.18);
+  border-color: rgba(168, 70, 43, 0.55);
+}
+.today-item--info {
+  color: var(--color-paper-dim);
+}
+.today-text {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.today-detail {
+  font-size: 0.8rem;
+  color: var(--color-paper-dim);
+}
+.today-empty {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  color: #9bbf7a;
+  background: rgba(155, 191, 122, 0.08);
+  border: 1px solid rgba(155, 191, 122, 0.3);
+  border-radius: 8px;
+}
+.admin-toast {
+  position: fixed;
+  right: 1rem;
+  top: 1rem;
+  z-index: 70;
+  max-width: min(24rem, calc(100vw - 2rem));
+  padding: 0.8rem 1.1rem;
+  text-align: left;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-paper);
+  background: var(--color-rust);
+  border: 1px solid rgba(236, 226, 203, 0.35);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transform: translateY(-0.75rem);
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.admin-toast.is-visible {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.booking-tools {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.reply-text:empty {
+  display: none;
+}
+#cleanup-details > summary {
+  list-style: none;
+}
+#cleanup-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* ==========================================================================
+   ADMIN — SETLISTEN (assets/js/setlist.js)
+   ========================================================================== */
+.setlist-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+@media (min-width: 1024px) {
+  .setlist-layout {
+    grid-template-columns: 260px minmax(0, 1fr);
+    align-items: start;
+  }
+}
+.setlist-list-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.7rem 0.85rem;
+  border-radius: 6px;
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-line);
+  color: var(--color-paper);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.setlist-list-item:hover,
+.setlist-list-item:focus-visible {
+  border-color: rgba(236, 226, 203, 0.25);
+}
+.setlist-list-item.active {
+  border-color: var(--color-gold);
+  background: rgba(199, 154, 62, 0.1);
+}
+.setlist-editor {
+  min-width: 0;
+}
+
+/* Spalten: Griff | Nr. | Titel | Notiz | Werkzeuge */
+.setlist-head-row,
+.sl-row.sl-song {
+  display: grid;
+  grid-template-columns: 28px 30px minmax(0, 1.1fr) minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+.setlist-head-row {
+  padding: 0 0.25rem 0.4rem;
+  border-bottom: 1px solid var(--color-line);
+}
+.setlist-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sl-row {
+  padding: 0.3rem 0.25rem;
+  border-bottom: 1px solid var(--color-line);
+  border-top: 2px solid transparent;
+  border-bottom-width: 1px;
+}
+.sl-row.sl-section {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.75rem;
+  border-bottom: 2px solid var(--color-gold);
+}
+.sl-row.is-dragging {
+  opacity: 0.4;
+}
+.sl-row.drop-before {
+  border-top-color: var(--color-gold);
+}
+.sl-row.drop-after {
+  border-bottom-color: var(--color-gold);
+  border-bottom-width: 2px;
+}
+.sl-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 32px;
+  color: var(--color-paper-dim);
+  cursor: grab;
+  border-radius: 4px;
+}
+.sl-handle:hover {
+  color: var(--color-paper);
+  background: rgba(236, 226, 203, 0.06);
+}
+.sl-handle svg {
+  width: 16px;
+  height: 16px;
+}
+.sl-nr {
+  font-weight: 700;
+  color: var(--color-gold);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.sl-title,
+.sl-note,
+.sl-section-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.875rem;
+  color: var(--color-paper);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+.sl-title {
+  font-weight: 600;
+}
+.sl-note {
+  color: var(--color-paper-dim);
+}
+.sl-note::placeholder {
+  color: var(--color-paper-dim);
+  opacity: 0.35;
+}
+.sl-section-input {
+  font-family: "Anton", "Arial Narrow", sans-serif;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+}
+.sl-title:hover,
+.sl-note:hover,
+.sl-section-input:hover {
+  border-color: var(--color-line);
+}
+.sl-title:focus,
+.sl-note:focus,
+.sl-section-input:focus {
+  outline: none;
+  border-color: var(--color-gold);
+  background: var(--color-ink-2);
+}
+.sl-tools {
+  display: inline-flex;
+  gap: 2px;
+}
+.sl-tools button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  color: var(--color-paper-dim);
+}
+.sl-tools button:hover:not(:disabled),
+.sl-tools button:focus-visible {
+  color: var(--color-paper);
+  background: rgba(236, 226, 203, 0.08);
+}
+.sl-tools button:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.sl-tools .sl-del:hover {
+  color: var(--color-rust-light);
+}
+.sl-tools svg {
+  width: 16px;
+  height: 16px;
+}
+/* Handy: Notiz in eine zweite Zeile unter den Titel */
+@media (max-width: 640px) {
+  .setlist-head-row {
+    display: none;
+  }
+  .sl-row.sl-song {
+    grid-template-columns: 28px 26px minmax(0, 1fr) auto;
+  }
+  .sl-row.sl-song .sl-note {
+    grid-column: 3 / 5;
+    grid-row: 2;
+  }
+  .sl-row.sl-song .sl-tools {
+    grid-column: 4;
+    grid-row: 1;
+  }
+}
+.repertoire-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.35rem 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  border-radius: 999px;
+  background: var(--color-ink-2);
+  border: 1px solid var(--color-line);
+}
+.repertoire-chip button {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  color: var(--color-paper-dim);
+  line-height: 1;
+}
+.repertoire-chip button:hover {
+  color: var(--color-rust-light);
+  background: rgba(168, 70, 43, 0.15);
+}
+#repertoire-details > summary {
+  list-style: none;
+}
+#repertoire-details > summary::-webkit-details-marker {
+  display: none;
+}
