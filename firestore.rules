@@ -1,0 +1,239 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Hilfsfunktion für die Eingabe-Prüfung -------------------------------
+    // Ein optionales Textfeld darf fehlen, muss aber – falls vorhanden – ein
+    // Text mit höchstens "max" Zeichen sein.
+    function optText(d, key, max) {
+      return !(key in d) || (d[key] is string && d[key].size() <= max);
+    }
+
+    // ---- Rollen & Rechte (Admin → „Benutzer & Rechte“) -----------------------
+    // Superadmin = wer in meta/owner eingetragen ist (einmalig beim ersten
+    // Login über „Superadmin übernehmen“ festgelegt). Alle anderen
+    // Bandmitglieder haben ein Dokument users/{uid} mit freigeschalteten
+    // Bereichen ("areas") — nur diese Bereiche dürfen sie lesen/ändern.
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isOwner() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/meta/owner)
+        && get(/databases/$(database)/documents/meta/owner).data.uid == request.auth.uid;
+    }
+    function me() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function isMember() {
+      return isOwner() || (signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && me().get('disabled', false) == false);
+    }
+    function perm(area) {
+      return isOwner() || (isMember() && me().get('areas', {}).get(area, false) == true);
+    }
+    function myMember() {
+      return me().get('member', '');
+    }
+    function seesAllSetlists() {
+      return isOwner() || (perm('setlisten') && me().get('setlistOthers', false) == true);
+    }
+
+    // Bewertungen: jeder darf eine neue (nicht freigegebene) Bewertung
+    // anlegen — aber nur mit den vorgesehenen Feldern und begrenzten Längen.
+    // Lesen dürfen alle nur freigegebene; Admins (eingeloggt) dürfen alles
+    // lesen, ändern (freigeben, antworten) und löschen.
+    match /reviews/{reviewId} {
+      allow create: if request.resource.data.keys().hasOnly(['name','eventName','rating','comment','approved','createdAt'])
+                    && request.resource.data.keys().hasAll(['name','rating','comment','approved'])
+                    && request.resource.data.approved == false
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 80
+                    && optText(request.resource.data, 'eventName', 120)
+                    && request.resource.data.rating is number
+                    && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+                    && request.resource.data.comment is string
+                    && request.resource.data.comment.size() > 0 && request.resource.data.comment.size() <= 1500
+                    && (!('createdAt' in request.resource.data) || request.resource.data.createdAt == request.time);
+      allow read: if resource.data.approved == true || perm('bewertungen');
+      // Nur wer den Bereich „Bewertungen“ hat, darf freigeben, antworten, löschen.
+      allow write: if perm('bewertungen');
+    }
+
+    // Buchungsanfragen: jeder darf eine anlegen (das ist das Absenden des
+    // Formulars) — aber nur mit den Formularfeldern, mit sinnvollen
+    // Mindest-/Höchstlängen und immer mit Status "neu". So kann niemand von
+    // außen z. B. eine fertige "Zusage" oder riesige Datenmengen einschleusen.
+    // Lesen/ändern/löschen dürfen nur Admins.
+    match /bookings/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['from_name','company','from_email','phone','event_date','event_type','location','guests','set_length','budget','tech_requirements','message','status','createdAt'])
+                    && request.resource.data.keys().hasAll(['from_name','from_email','event_date','location','status','createdAt'])
+                    && request.resource.data.status == 'neu'
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.from_name is string
+                    && request.resource.data.from_name.size() > 0 && request.resource.data.from_name.size() <= 120
+                    && request.resource.data.from_email is string
+                    && request.resource.data.from_email.matches('.+@.+') && request.resource.data.from_email.size() <= 200
+                    && request.resource.data.event_date is string
+                    && request.resource.data.event_date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+                    && request.resource.data.location is string
+                    && request.resource.data.location.size() > 0 && request.resource.data.location.size() <= 300
+                    && optText(request.resource.data, 'company', 160)
+                    && optText(request.resource.data, 'phone', 60)
+                    && optText(request.resource.data, 'event_type', 60)
+                    && optText(request.resource.data, 'guests', 20)
+                    && optText(request.resource.data, 'set_length', 120)
+                    && optText(request.resource.data, 'budget', 120)
+                    && optText(request.resource.data, 'tech_requirements', 1500)
+                    && optText(request.resource.data, 'message', 4000);
+      // Nur wer den Bereich „Buchungsanfragen“ hat, darf lesen/ändern/löschen.
+      allow read, write: if perm('buchungen');
+    }
+
+    // Kontaktnachrichten: es gibt kein öffentliches Kontaktformular mehr
+    // (Anfragen laufen über "bookings") — daher nur noch für Admins.
+    match /contacts/{id} {
+      allow read, write: if isOwner();
+    }
+
+    // Zähler: Besucher dürfen NUR hochzählen (um genau 1), nicht beliebige
+    // Werte schreiben. Lesen und alles andere dürfen nur Admins.
+    match /stats/{id} {
+      allow read: if isMember();
+      allow write: if isOwner();
+
+      // Gesamtzähler "visits"
+      allow create: if id == 'visits'
+                    && request.resource.data.keys().hasOnly(['count','lastVisitAt'])
+                    && request.resource.data.count == 1;
+      allow update: if id == 'visits'
+                    && request.resource.data.keys().hasOnly(['count','lastVisitAt'])
+                    && request.resource.data.count == resource.data.count + 1;
+
+      // Tageszähler "day-JJJJ-MM-TT" (Aufrufe, geöffnete Buchungsfenster,
+      // Instagram-Klicks): nur diese Zähler, je Aufruf höchstens +1.
+      allow create: if id.matches('day-[0-9]{4}-[0-9]{2}-[0-9]{2}')
+                    && request.resource.data.keys().hasOnly(['date','views','bookingOpen','instagram'])
+                    && request.resource.data.date is string
+                    && id == 'day-' + request.resource.data.date
+                    && request.resource.data.get('views', 0) in [0, 1]
+                    && request.resource.data.get('bookingOpen', 0) in [0, 1]
+                    && request.resource.data.get('instagram', 0) in [0, 1];
+      allow update: if id.matches('day-[0-9]{4}-[0-9]{2}-[0-9]{2}')
+                    && request.resource.data.keys().hasOnly(['date','views','bookingOpen','instagram'])
+                    && request.resource.data.date == resource.data.date
+                    && (request.resource.data.get('views', 0) - resource.data.get('views', 0)) in [0, 1]
+                    && (request.resource.data.get('bookingOpen', 0) - resource.data.get('bookingOpen', 0)) in [0, 1]
+                    && (request.resource.data.get('instagram', 0) - resource.data.get('instagram', 0)) in [0, 1];
+    }
+
+    // Auftrittsorte ("Schon aufgetreten bei") & Playlist: von der Website
+    // aus nur lesbar (öffentlich sichtbar), Hinzufügen/Löschen nur über
+    // den Admin-Bereich (eingeloggt).
+    match /venues/{id} {
+      allow read: if true;
+      allow write: if perm('auftrittsorte');
+    }
+    match /songs/{id} {
+      allow read: if true;
+      allow write: if perm('playlist');
+    }
+    // Termine: auch „Buchungsanfragen“ darf schreiben (Zusage trägt den
+    // Termin automatisch ein).
+    match /shows/{id} {
+      allow read: if true;
+      allow write: if perm('termine') || perm('buchungen');
+    }
+    match /gallery/{id} {
+      allow read: if true;
+      allow write: if perm('medien');
+    }
+    match /videos/{id} {
+      allow read: if true;
+      allow write: if perm('medien');
+    }
+    match /band/{id} {
+      allow read: if true;
+      allow write: if perm('band');
+    }
+    // Häufige Fragen (FAQ): öffentlich lesbar, nur der Admin schreibt.
+    match /faq/{id} {
+      allow read: if true;
+      allow write: if perm('faq');
+    }
+    // Einstellungen (z. B. Ankündigungs-Banner): öffentlich lesbar, nur der
+    // Admin darf ändern.
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if perm('einstellungen');
+    }
+    // Gesperrte Tage (Admin → Kalender): die Datumsangaben müssen öffentlich
+    // lesbar sein, weil die Homepage damit Tage im Buchungsformular sperrt.
+    // Der interne Sperrgrund liegt getrennt in "blockedNotes" und ist nur für
+    // den eingeloggten Admin lesbar.
+    match /blocked/{id} {
+      allow read: if true;
+      allow write: if perm('kalender') || perm('buchungen');
+    }
+    match /blockedNotes/{id} {
+      allow read, write: if perm('kalender') || perm('buchungen');
+    }
+
+    // ---- Setlisten-Planer (Admin → Setlisten) ---------------------------------
+    // Gemeinsame Song-Liste (setlist/library) für alle mit Bereich „Setlisten“.
+    // setlist/state = Daten der alten Planer-Version (wird einmalig übernommen).
+    match /setlist/{id} {
+      allow read, write: if perm('setlisten');
+    }
+    // Jede Setliste ist ein eigenes Dokument mit Besitzer ("owner").
+    // Lesen: eigene — oder alle, wenn „darf Setlisten der anderen sehen“.
+    // Anlegen/Zuweisen: jeder mit „Setlisten“. Ändern/Löschen: Besitzer,
+    // wer sie zugewiesen hat ("from") oder der Superadmin.
+    match /setlists/{id} {
+      allow read: if perm('setlisten')
+                  && (resource.data.owner == myMember() || seesAllSetlists());
+      allow create: if perm('setlisten');
+      allow update, delete: if perm('setlisten')
+                  && (resource.data.owner == myMember()
+                      || resource.data.get('from', '') == myMember()
+                      || isOwner());
+    }
+    // Persönliche Notizen, Akkorde, CTRL-Hinweise: nur die Person selbst.
+    // (Der Superadmin darf schreiben, damit er bei der einmaligen Übernahme
+    // die alten Notizen verteilen kann.)
+    match /setlistNotes/{member} {
+      allow read, write: if (perm('setlisten') && member == myMember()) || isOwner();
+    }
+
+    // ---- Benutzer & Rechte ----------------------------------------------------
+    // meta/owner: legt einmalig fest, wer Superadmin ist. Anlegen darf es nur,
+    // wer sich selbst einträgt und solange es noch nicht existiert.
+    match /meta/owner {
+      allow read: if signedIn();
+      allow create: if signedIn()
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.keys().hasOnly(['uid', 'email', 'claimedAt']);
+      allow update, delete: if isOwner();
+    }
+    // Rechte je Bandmitglied: nur der Superadmin verwaltet sie. Jede/r darf
+    // das eigene Dokument lesen (damit die Konsole weiß, was sie zeigen soll)
+    // und es aus einer Einladung des Superadmins selbst anlegen.
+    match /users/{uid} {
+      allow read: if isOwner() || (signedIn() && request.auth.uid == uid);
+      allow write: if isOwner();
+      allow create: if signedIn() && request.auth.uid == uid
+                    && request.auth.token.email != null
+                    && exists(/databases/$(database)/documents/invites/$(request.auth.token.email.lower()))
+                    && request.resource.data.member == get(/databases/$(database)/documents/invites/$(request.auth.token.email.lower())).data.member
+                    && request.resource.data.areas == get(/databases/$(database)/documents/invites/$(request.auth.token.email.lower())).data.areas
+                    && request.resource.data.setlistOthers == get(/databases/$(database)/documents/invites/$(request.auth.token.email.lower())).data.setlistOthers
+                    && request.resource.data.disabled == false;
+    }
+    // Einladungen für schon bestehende Logins (per E-Mail-Adresse).
+    match /invites/{email} {
+      allow read: if isOwner() || (signedIn() && request.auth.token.email != null && request.auth.token.email.lower() == email);
+      allow write: if isOwner();
+    }
+  }
+}
