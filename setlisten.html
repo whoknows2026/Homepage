@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<!-- Setlisten-Planer für den Admin-Bereich (wird in admin.html unter "Setlisten" angezeigt).
+     Daten: Firestore-Dokument setlist/state — nur für eingeloggte Admins (siehe README, Abschnitt 9.3). -->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Setlisten-Planer — Who Knows?</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="assets/img/favicon.ico">
+<meta name="theme-color" content="#14100c">
+<!-- Firebase: gleicher Login & gleiche Datenbank wie der Admin-Bereich -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="assets/js/firebase-config.js"></script>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{--bg:#120e0b;--panel:#1c1612;--panel2:#271f19;--line:#3a2e25;--text:#efe6d6;--mute:#a7978a;--acc:#b5472b;--acc2:#d9a441;--red:#e0623f;--ok:#8fbf6a}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 'Work Sans',system-ui,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+header{display:flex;align-items:center;gap:18px;padding:12px 20px;border-bottom:1px solid var(--line);background:#0e0b09;position:sticky;top:0;z-index:5;flex-wrap:wrap}
+.logo{font-family:Anton,Impact,sans-serif;font-size:24px;letter-spacing:.5px;color:var(--text);line-height:1}
+.logo span{color:var(--acc2);font-size:14px;letter-spacing:2px;margin-left:8px;vertical-align:middle}
+nav{display:flex;gap:4px}
+nav button{background:none;border:0;padding:8px 14px;border-radius:8px;color:var(--mute);cursor:pointer;font-weight:600}
+nav button.on{background:var(--panel2);color:var(--acc2)}
+.who{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--mute)}
+.who select{width:auto;padding:6px 10px;font-weight:600;color:var(--acc)}
+.pickgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pickgrid .btn{padding:16px;font-size:17px}
+.status{font-size:12px;color:var(--mute)}
+main{padding:18px 20px 60px}
+.embedded header{position:static;padding:8px 14px;background:transparent;border-bottom:1px solid var(--line)}
+.embedded .logo{display:none}
+.embedded main{padding:14px 14px 40px}
+.btn{background:var(--panel2);border:1px solid var(--line);padding:8px 13px;border-radius:8px;cursor:pointer;font-weight:600;font-size:14px;white-space:nowrap}
+.btn:hover{border-color:#44444f}
+.btn.pri{background:var(--acc);color:#fff4e6;border-color:var(--acc);font-family:Anton,Impact,sans-serif;font-weight:400;letter-spacing:.4px}
+.btn.pri:hover{background:#c9583a}
+.btn.danger{color:var(--red)}
+.btn.sm{padding:5px 9px;font-size:13px}
+.ico{background:none;border:0;color:var(--mute);cursor:pointer;padding:4px 7px;border-radius:6px;font-size:15px}
+.ico:hover{background:var(--panel2);color:var(--text)}
+input[type=text],input[type=date],input[type=number],input[type=search],textarea,select{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--acc)}
+label.f{display:block;font-size:12px;color:var(--mute);font-weight:600;margin-bottom:4px}
+.grid3{display:grid;grid-template-columns:230px minmax(0,1fr) 300px;gap:18px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.aside h3,.card h3{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
+.setlink{display:block;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:8px;padding:8px 10px;cursor:pointer;margin-bottom:3px}
+.setlink:hover{background:var(--panel2)}
+.setlink.on{background:var(--panel2);border-color:var(--acc2)}
+.setlink b{display:block;font-weight:600}
+.fromtag{display:inline-block;font-size:11px;color:var(--acc2);border:1px solid #6b5226;border-radius:5px;padding:0 6px;margin:2px 6px 2px 0}
+.mgrid .check.dis{opacity:.45}
+.setlink small{color:var(--mute);font-size:12px}
+.fields{display:grid;grid-template-columns:2fr 1fr 1.4fr;gap:10px;margin-bottom:12px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.stats{color:var(--mute);font-size:13px;margin:0 0 10px}
+.stats b{color:var(--text)}
+ol.items{list-style:none;margin:0;padding:0}
+.it{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:7px 8px;margin-bottom:6px}
+.it.sortable-ghost{opacity:.35}
+.it.sortable-chosen{border-color:var(--acc)}
+.handle{cursor:grab;color:#5c5c68;padding:2px 4px;user-select:none;font-size:18px;line-height:1}
+.nr{font-family:Anton,Impact,sans-serif;font-size:22px;color:var(--acc);width:30px;text-align:right;flex:none}
+.it .main{flex:1;min-width:0}
+.it .t{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:17px;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it .a{color:var(--mute);font-weight:400}
+.chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:3px}
+.chip{font-size:11px;background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:#c4c4cf}
+.chip.p{border-color:#6b5226;color:var(--acc2)}
+.note{background:transparent!important;border:0!important;border-bottom:1px dashed var(--line)!important;border-radius:0!important;padding:2px 0!important;font-size:13px;color:#c4c4cf;margin-top:3px}
+.it.brk{background:transparent;border-style:dashed;border-color:#4a3b16}
+.it.brk{border-color:var(--sc,#4a3b16);background:color-mix(in srgb,var(--sc,#f5a524) 12%,transparent)}
+.it.brk.enc{border-style:solid}
+.it.brk .star{color:#e0623f;font-size:18px}
+.it.brk.enc input{color:#e0623f!important}
+.encbtn{color:#e0623f;border-color:#5a2a1c}
+.it.brk input{color:var(--sc,var(--acc))!important;background:transparent;border:0;font-family:Anton,Impact,sans-serif;font-size:20px;letter-spacing:1px;color:var(--acc);padding:2px 0}
+.brk .sub{font-size:12px;color:var(--mute);white-space:nowrap}
+.empty{color:var(--mute);text-align:center;padding:30px 10px;border:1px dashed var(--line);border-radius:10px}
+.lib{max-height:60vh;overflow:auto;margin-top:8px}
+.libit{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;cursor:pointer}
+.libit:hover{background:var(--panel2)}
+.libit .main{flex:1;min-width:0}
+.libit .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.libit small{color:var(--mute)}
+.libit .in{color:var(--ok);font-size:13px}
+.libit .plus{color:var(--acc2);font-weight:700}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:12px;color:var(--mute);font-weight:600;padding:8px;border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.05em}
+td{padding:9px 8px;border-bottom:1px solid var(--line)}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--panel2)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:50px 14px;z-index:50;overflow:auto}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;width:100%;max-width:560px}
+.modal h2{margin:0 0 14px;font-size:20px}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mgrid .full{grid-column:1/-1}
+.mfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.mfoot .left{margin-right:auto}
+.check{display:flex;gap:8px;align-items:center;margin:6px 0;cursor:pointer}
+.check input{width:auto;accent-color:var(--acc)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--acc);padding:10px 16px;border-radius:10px;z-index:80;font-weight:600}
+.stage{position:fixed;inset:0;background:#000;z-index:60;display:flex;flex-direction:column;user-select:none}
+.stage .top{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;color:#777;font-size:14px}
+.stage .cur{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:10px 20px;cursor:pointer}
+.stage .big{font-family:Anton,Impact,sans-serif;font-size:clamp(48px,11vw,150px);line-height:.95;color:#fff}
+.stage .bnr{font-family:Anton,Impact,sans-serif;font-size:clamp(28px,5vw,60px);color:var(--acc)}
+.stage .meta{margin-top:14px;font-size:clamp(16px,2.6vw,30px);color:var(--acc2)}
+.stage .snote{margin-top:8px;font-size:clamp(14px,2vw,22px);color:#aaa}
+.stage .next{padding:16px 20px;border-top:1px solid #222;color:#888;font-size:clamp(16px,2.4vw,26px);text-align:center}
+.stage .next b{color:#ddd}
+.stage .nav{display:flex;gap:10px;justify-content:center;padding:0 0 18px}
+.stage .nav .btn{background:#111;border-color:#333;font-size:18px;padding:12px 26px}
+.mylink{display:block;background:none;border:0;color:var(--acc2);font-size:13px;padding:4px 0 0;cursor:pointer;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.myrow{display:flex;align-items:center;gap:10px;margin-top:5px;min-width:0}
+.ctrlbox{display:flex;align-items:center;flex:none;border:1px solid #6a2a1a;border-radius:6px;overflow:hidden;background:#1a0f0b}
+.ctrlbox span{background:#b5472b;color:#fff4e6;font-family:Anton,Impact,sans-serif;font-size:12px;letter-spacing:.5px;padding:3px 6px}
+.ctrlbox input::placeholder{color:#6a4a3e}
+.ctrlbox input{border:0!important;background:transparent!important;width:120px!important;padding:3px 7px!important;font-size:13px;font-weight:700;color:#ff7a5c!important;border-radius:0!important}
+.myrow .mylink{padding:0;min-width:0}
+.stage .ctrl{margin-top:14px;font-weight:800;color:#ff5a3c;font-size:clamp(18px,3vw,36px)}
+.mylink:hover{text-decoration:underline}
+.mynote{font-family:ui-monospace,Menlo,Consolas,monospace!important;font-size:13px;margin-top:6px;white-space:pre;overflow-x:auto;resize:vertical}
+.stage .chords{margin-top:16px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:clamp(15px,2.2vw,26px);color:#ddd;white-space:pre;text-align:left;max-width:95vw;overflow:auto}
+.acts{display:flex;align-items:center;gap:2px;flex:none}
+.robar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:rgba(217,164,65,.1);border:1px solid #6b5226;border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:13px;color:var(--acc2)}
+.ro .fields input,.ro .note,.ro .it.brk input{pointer-events:none;opacity:.75}
+.ro .acts,.ro .handle,.ro .toolbar .sec:not([data-act=copyText]),.ro [data-act=addBreak],.ro [data-act=addEncore]{display:none!important}
+.fromtag.owntag{color:var(--text);border-color:var(--line)}
+.setpick,.morebtn,.fab,.mob{display:none}
+.sheetlist{display:grid;gap:8px}
+.sheetbtn{width:100%;text-align:left;padding:13px 14px;font-size:15px}
+.sheethead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.sheethead h2{margin:0}
+.pdfprev{width:100%;max-height:70vh;overflow:auto;border:1px solid var(--line);border-radius:8px;background:#3a302a;padding:12px;text-align:center}
+.pdfprev canvas{display:block;margin:0 auto 12px;background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.5)}
+.pvmsg{color:var(--text);padding:60px 10px;line-height:1.6}
+.modal:has(.pdfprev){max-width:760px}
+@media (max-width:1000px){.grid3{grid-template-columns:minmax(0,1fr)}.fields{grid-template-columns:1fr 1fr}.fields>div:first-child{grid-column:1/-1}.lib{max-height:40vh}}
+@media (max-width:700px){
+  html,body{overflow-x:hidden}
+  input[type=text],input[type=date],input[type=number],input[type=search],textarea,select{font-size:16px}
+  header{gap:8px 10px;padding:8px 12px}
+  .logo{font-size:19px}.logo span{display:none}
+  nav button{padding:7px 10px;font-size:14px}
+  .who{font-size:0;gap:0;margin-left:auto}.who select{padding:6px 8px;font-size:15px}
+  #nav{flex:1;min-width:0}
+  .toolbar{display:grid;grid-template-columns:1fr 1fr auto}
+  .toolbar .btn{font-size:14px;text-align:center}
+  .status{flex-basis:100%;margin:0;text-align:right;font-size:11px}
+  .status:not(.warn){display:none}
+  .status.warn{color:#ff9a7a}
+  main{padding:10px 10px 90px}
+  .grid3{gap:12px}
+  .card{padding:12px;border-radius:10px}
+  .aside{display:none}
+  .grid3>.card:last-child:not(:only-child){display:none}
+  .setpick{display:flex;gap:8px;margin-bottom:12px}
+  .setpick select{flex:1;min-width:0;font-weight:600;color:var(--acc2)}
+  .fields{grid-template-columns:minmax(0,1fr);gap:8px}
+  .fields>div{min-width:0}
+  .fields input{min-width:0;max-width:100%;-webkit-appearance:none;appearance:none}
+  main,.embedded main{padding-bottom:110px}
+  .toolbar{gap:6px}
+  .toolbar .btn{padding:9px 11px}
+  .toolbar .sec{display:none}
+  .morebtn{display:inline-block}
+  .fab{display:block;position:fixed;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:40;padding:14px;border-radius:12px;border:0;background:var(--acc);color:#fff4e6;font-family:Anton,Impact,sans-serif;font-size:17px;letter-spacing:.4px;box-shadow:0 6px 22px rgba(0,0,0,.55);cursor:pointer}
+  .desk{display:none}.mob{display:inline}
+  .it{flex-wrap:wrap;padding:8px 8px 6px;gap:4px 6px;align-items:flex-start}
+  .it .handle{padding:6px 2px;font-size:20px;touch-action:none}
+  .nr{width:26px;font-size:21px;padding-top:2px}
+  .it .main{flex:1 1 0;min-width:0}
+  .it .t{white-space:normal;font-size:16px;line-height:1.25}
+  .it .a{font-size:13px}
+  .acts{width:100%;justify-content:flex-end;gap:4px;border-top:1px solid rgba(255,255,255,.05);padding-top:4px}
+  .ico{min-width:40px;min-height:36px;font-size:17px;border:1px solid var(--line);border-radius:8px}
+  .ico.del{color:#e0623f}
+  .it.brk{flex-wrap:wrap;align-items:center}
+  .it.brk .main{flex:1 1 0}
+  .it.brk .acts{width:auto;border-top:0;padding-top:0}
+  .it.brk .sub{flex-basis:100%;order:5;padding-left:28px}
+  .myrow{flex-wrap:wrap;gap:6px 10px}
+  .ctrlbox input{width:150px!important}
+  .mylink{white-space:normal;padding:6px 0 2px}
+  .hide-s{display:none}.mgrid{grid-template-columns:1fr}
+  td{padding:10px 6px}
+  .modal-bg{padding:10px;align-items:flex-start}
+  .modal{padding:16px;border-radius:12px}
+  .mfoot{flex-wrap:wrap}
+  .mfoot .btn{flex:1 1 auto;text-align:center}
+  .mfoot .left{flex-basis:100%;margin-right:0}
+  .morebtn{font-size:20px!important;line-height:1;padding:6px 14px!important}
+  .modal-bg.sheet{padding:0}
+  .modal-bg.sheet .modal{max-width:none;min-height:100dvh;border-radius:0;border:0;padding:14px 12px}
+  .sheetlib{max-height:none}
+  .libit{padding:12px 8px;border-bottom:1px solid var(--line);border-radius:0}
+  .pdfprev{max-height:62vh;padding:6px}
+  .stage .nav .btn{padding:14px 30px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Who Knows?<span>SETLIST</span></div>
+  <nav id="nav">
+    <button data-tab="sets">Setlisten</button>
+    <button data-tab="songs">Songs</button>
+    <button data-tab="settings">Einstellungen</button>
+  </nav>
+  <div class="who"><span id="whoLabel">Ich bin</span> <select id="who" aria-label="Person / Ansicht"></select></div>
+  <div class="status" id="status">Lade…</div>
+</header>
+<main id="app"></main>
+<div id="layer"></div>
+
+<script>
+(function(){
+"use strict";
+try{ if(window.self!==window.top) document.documentElement.classList.add('embedded'); }catch(e){ document.documentElement.classList.add('embedded'); }
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-5);
+const LS='setlist-planer-v1';
+
+function defPdf(){return {numbers:true,artist:false,key:true,preset:true,tuning:false,bpm:false,dur:false,gigNotes:true,songNotes:false,myNotes:true,ctrl:true,breaks:true,footer:true,size:'auto',layout:'notes',color:true};}
+let MEMBERS=['Uli','Nik','Marie','Tobi','Raffa','Tim'];
+let me=null; try{ me=localStorage.getItem('setlist-user'); }catch(e){} if(!MEMBERS.includes(me)) me=null;
+function getPdfOpts(){ const u=(state.settings.pdfUser||{})[me]; return Object.assign(defPdf(),u||{}); }
+function myNote(id){ const m=(state.myNotes||{})[me]; return (m&&m[id])||''; }
+function myCtrl(id){ const m=(state.myCtrl||{})[me]; return (m&&m[id])||''; }
+function myPreset(id){ const m=(state.myPreset||{})[me]; return (m&&m[id])||''; }
+function setMyPreset(id,v){ if(!me) return; state.myPreset=state.myPreset||{}; const m=state.myPreset[me]=state.myPreset[me]||{}; if(v&&String(v).trim()) m[id]=String(v).trim(); else delete m[id]; }
+/** Alte, für alle sichtbare Presets (song.preset) einmalig in die persönlichen
+ *  Presets einer Person verschieben. Gibt true zurück, wenn etwas geändert wurde. */
+function movePresetsTo(person){
+  if(!person) return false; let moved=false;
+  state.myPreset=state.myPreset||{}; const m=state.myPreset[person]=state.myPreset[person]||{};
+  state.songs.forEach(s=>{ if(s.preset){ if(!m[s.id]) m[s.id]=s.preset; delete s.preset; moved=true; } });
+  return moved;
+}
+function setMyCtrl(id,v){ if(!me) return; state.myCtrl=state.myCtrl||{}; const m=state.myCtrl[me]=state.myCtrl[me]||{}; if(v&&v.trim()) m[id]=v; else delete m[id]; }
+function setMyNote(id,v){ if(!me) return; state.myNotes=state.myNotes||{}; const m=state.myNotes[me]=state.myNotes[me]||{}; if(v&&v.trim()) m[id]=v; else delete m[id]; }
+let RM=null; // Rechte-Modus (Website mit Benutzer & Rechte): {uid, member, owner, others}
+const visibleSets=()=>{
+  if(RM){ const v=ui.viewOwner; return v==='*'?state.setlists:state.setlists.filter(s=>s.owner===(v||me)); }
+  return state.setlists.filter(s=>!s.owner||s.owner===me);
+};
+const isRO=sl=>!!(RM&&sl&&sl.owner!==me&&!RM.owner);
+function defaults(){return {songs:[],setlists:[],myNotes:{},myCtrl:{},myPreset:{},settings:{bandName:'Who Knows?',pdfUser:{}}};}
+let state=defaults();
+const ui={tab:'sets',setId:null,addQ:'',songQ:'',songSort:'title',viewOwner:null};
+
+/* ---------- helpers ---------- */
+function parseDur(v){
+  v=String(v||'').trim(); if(!v) return 0;
+  const m=v.match(/^(\d+)[:.,](\d{1,2})$/); if(m) return (+m[1])*60+(+m[2]);
+  if(/^\d+$/.test(v)){const n=+v; return n<=20?n*60:n;}
+  return 0;
+}
+function fmtDur(s){
+  s=Math.round(s||0); if(!s) return '';
+  const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=String(s%60).padStart(2,'0');
+  return h?`${h}:${String(m).padStart(2,'0')}:${x}`:`${m}:${x}`;
+}
+function fmtDate(d){ if(!d) return ''; const p=d.split('-'); return p.length===3?`${p[2]}.${p[1]}.${p[0]}`:d; }
+const songById=id=>state.songs.find(s=>s.id===id);
+const curSet=()=>visibleSets().find(s=>s.id===ui.setId);
+function setStats(sl){
+  let n=0,t=0,missing=0;
+  for(const it of sl.items){ if(it.type!=='song') continue; const s=songById(it.songId); if(!s) continue; n++; if(s.dur) t+=s.dur; else missing++; }
+  return {n,t,missing};
+}
+function usage(songId){return state.setlists.filter(sl=>sl.items.some(i=>i.songId===songId)).length;}
+function sortedSets(){return visibleSets().slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.created||0)-(a.created||0));}
+function findSongByTitle(t){t=t.trim().toLowerCase(); return state.songs.find(s=>s.title.trim().toLowerCase()===t);}
+
+/* ---------- persistence ---------- */
+let db=null,docRef=null,lastJSON='',saveTimer=null,saving=false,again=false,readOnly=false,dirty=false;
+function setStatus(t){ const el=$('#status'); el.textContent=t; el.classList.toggle('warn',/Keine|nicht|Nicht|aus –|wackelt|voll/.test(t)); }
+function merge(d){
+  const def=defaults(); if(!d||typeof d!=='object') return;
+  state.songs=Array.isArray(d.songs)?d.songs:[];
+  state.setlists=Array.isArray(d.setlists)?d.setlists:[];
+  state.setlists.forEach(sl=>{ if(!Array.isArray(sl.items)) sl.items=[]; });
+  const st=d.settings||{};
+  state.settings=Object.assign(def.settings,st); if(!state.settings.pdfUser||typeof state.settings.pdfUser!=='object') state.settings.pdfUser={};
+  state.myNotes=(d.myNotes&&typeof d.myNotes==='object')?d.myNotes:{};
+  state.myCtrl=(d.myCtrl&&typeof d.myCtrl==='object')?d.myCtrl:{};
+  state.myPreset=(d.myPreset&&typeof d.myPreset==='object')?d.myPreset:{};
+}
+function saveLocal(){ if(RM) return; try{localStorage.setItem(LS,JSON.stringify(state));}catch(e){} }
+function loadLocal(){ try{const s=localStorage.getItem(LS); if(s) merge(JSON.parse(s));}catch(e){} }
+function commit(rerender){
+  if(rerender!==false) render();
+  saveLocal(); dirty=true;
+  if(RM){ clearTimeout(saveTimer); saveTimer=setTimeout(rmFlush,700); return; }
+  if(!docRef||readOnly){ dirty=false; return; }
+  clearTimeout(saveTimer); saveTimer=setTimeout(flush,700);
+}
+async function flush(){
+  if(saving){again=true;return;}
+  saving=true; const json=JSON.stringify(state);
+  if(json!==lastJSON){
+    setStatus('Speichere…');
+    try{ await docRef.set({state:json,updated:Date.now()}); lastJSON=json; setStatus('Gespeichert ✓'); }
+    catch(e){
+      const c=e&&e.code;
+      if(c==='invalid_argument'||c==='permission-denied'){ readOnly=true; setStatus(c==='permission-denied'?'Keine Schreibrechte – Firestore-Regeln ergänzen (README)':'Nur Ansicht – Änderungen bleiben lokal'); }
+      else if(c==='quota_exceeded'){ setStatus('Speicher voll'); toast('Speicherplatz voll – lösche alte Setlisten.'); }
+      else if(c==='unavailable'||c==='deadline-exceeded'){ setTimeout(()=>commit(false),1500); setStatus('Verbindung wackelt…'); }
+      else setStatus('Nicht gespeichert (lokal gesichert)');
+    }
+  }
+  saving=false; dirty=false;
+  if(again){again=false; flush();}
+}
+function hasFirebase(){ return typeof fbDb!=='undefined' && fbDb && typeof fbAuth!=='undefined' && fbAuth; }
+async function initCloud(){
+  // Variante 1: eingebaut in die Band-Website (Firebase / Firestore)
+  if(hasFirebase()){
+    setStatus('Verbinde …');
+    let started=false;
+    fbAuth.onAuthStateChanged(async u=>{
+      if(!u){ showLoginNeeded(); return; }
+      hideLoginNeeded();
+      if(started) return; started=true;
+      let ownerDoc=null;
+      try{ ownerDoc=await fbDb.collection('meta').doc('owner').get(); }catch(e){ ownerDoc=null; }
+      if(ownerDoc&&ownerDoc.exists){ await startRights(u,ownerDoc.data()); }
+      else { if(!me) pickUser(true); watchDoc(fbDb.collection('setlist').doc('state')); }
+    });
+    return;
+  }
+  // Variante 2: als Claude-Artefakt
+  if(!window.claude||typeof window.claude.use!=='function'){ setStatus('Lokal gespeichert'); return; }
+  try{ db=await window.claude.use('db'); }catch(e){ db=null; }
+  if(!db){ setStatus('Lokal gespeichert'); return; }
+  watchDoc(db.doc('band/state'));
+}
+function showLoginNeeded(){
+  setStatus('Nicht angemeldet');
+  if(document.getElementById('loginNeeded')) return;
+  const d=document.createElement('div'); d.id='loginNeeded'; d.className='modal-bg';
+  d.innerHTML='<div class="modal" style="text-align:center"><h2>Bitte anmelden</h2><p class="stats">Der Setlisten-Planer ist nur für die Band. Melde dich im Admin-Bereich an.</p><div class="mfoot" style="justify-content:center"><a class="btn pri" href="admin.html#setlisten" target="_top" style="text-decoration:none">Zum Admin-Login</a></div></div>';
+  document.body.appendChild(d);
+}
+function hideLoginNeeded(){ const d=document.getElementById('loginNeeded'); if(d) d.remove(); }
+function watchDoc(ref){
+  docRef=ref;
+  const timer=setTimeout(()=>setStatus('Cloud nicht erreichbar – lokal gespeichert'),10000);
+  docRef.onSnapshot(snap=>{
+    if(!snap.metadata.fromCache) clearTimeout(timer);
+    if(snap.metadata.hasPendingWrites) return;
+    if(snap.exists){
+      const j=(snap.data()||{}).state;
+      if(typeof j==='string'){
+        if(j!==lastJSON && !dirty && j!==JSON.stringify(state)){
+          try{ merge(JSON.parse(j)); lastJSON=j; saveLocal(); if(!document.activeElement||!document.activeElement.matches('input,textarea')) render(); else pendingRender=true; }catch(e){}
+        } else lastJSON=j;
+      }
+      setStatus('Synchronisiert ✓');
+    } else if(!snap.metadata.fromCache){
+      setStatus('Bereit');
+      if(state.songs.length||state.setlists.length){ dirty=true; flush(); }
+    }
+  },err=>{ clearTimeout(timer); docRef=null;
+    if(err&&err.code==='permission-denied') setStatus('Keine Berechtigung – Firestore-Regeln ergänzen (README)');
+    else setStatus('Cloud-Sync aus – lokal gespeichert'); });
+}
+/* ---------- Rechte-Modus (Login bestimmt die Person) ---------- */
+let rmPendingPresets=false, rmNotesLoaded=false, rmLastLib='', rmLastNotes='', rmLastSet={}, rmSetMeta={}, rmSaving=false, rmAgain=false;
+const libRef=()=>fbDb.collection('setlist').doc('library');
+const setsCol=()=>fbDb.collection('setlists');
+const notesRef=()=>fbDb.collection('setlistNotes').doc(me);
+function setDocData(sl){ return {owner:sl.owner||me, from:sl.from||'', date:sl.date||'', data:JSON.stringify(sl), updated:Date.now()}; }
+function showNoRights(text){
+  setStatus('Keine Berechtigung');
+  const d=document.createElement('div'); d.className='modal-bg';
+  d.innerHTML='<div class="modal" style="text-align:center"><h2>Kein Zugriff auf Setlisten</h2><p class="stats">'+esc(text||'Für deinen Login ist der Bereich „Setlisten“ nicht freigeschaltet. Bitte wende dich an den Superadmin.')+'</p></div>';
+  document.body.appendChild(d);
+}
+async function startRights(u,owner){
+  let ud=null; try{ ud=await fbDb.collection('users').doc(u.uid).get(); }catch(e){ ud=null; }
+  const d=ud&&ud.exists?ud.data():null;
+  const isOwner=owner.uid===u.uid;
+  if(!d||!d.member){ showNoRights(isOwner?'Dein Superadmin-Zugang hat noch kein Bandmitglied zugeordnet. Bitte lade die Admin-Konsole neu.':null); return; }
+  if(!isOwner&&(d.disabled||!(d.areas||{}).setlisten)){ showNoRights(); return; }
+  // Bandmitglieder aus der Admin-Konsole (Benutzer & Rechte)
+  try{ const md=await fbDb.collection('meta').doc('members').get(); if(md.exists&&Array.isArray(md.data().list)){ const act=md.data().list.filter(x=>x&&x.name&&x.active!==false).map(x=>x.name); if(act.length) MEMBERS=act; } }catch(e){}
+  try{ fbDb.collection('meta').doc('members').onSnapshot(doc=>{ if(doc.exists&&Array.isArray(doc.data().list)){ const act=doc.data().list.filter(x=>x&&x.name&&x.active!==false).map(x=>x.name); if(act.length){ MEMBERS=act; rmRerender(); } } },()=>{}); }catch(e){}
+  RM={uid:u.uid, member:d.member, owner:isOwner, others:isOwner||!!d.setlistOthers};
+  me=d.member; ui.viewOwner=null;
+  state=defaults(); ui.setId=null;
+  document.documentElement.classList.add('rm');
+  render();
+  setStatus('Lade …');
+  try{ await rmMigrate(); }catch(e){ console.warn('Übernahme fehlgeschlagen',e); }
+  rmSubscribe();
+}
+async function rmMigrate(){
+  const lib=await libRef().get();
+  if(lib.exists||!RM.owner) return;
+  // Einmalig: Daten der alten Version (ein gemeinsames Dokument) aufteilen
+  let o=null;
+  try{ const old=await fbDb.collection('setlist').doc('state').get(); if(old.exists) o=JSON.parse(old.data().state); }catch(e){ o=null; }
+  if(!o){ try{ const l=localStorage.getItem(LS); if(l) o=JSON.parse(l); }catch(e){} }
+  o=o||{};
+  const ownPresets={}; (o.songs||[]).forEach(x=>{ if(x.preset){ ownPresets[x.id]=x.preset; delete x.preset; } });
+  o.myPreset=o.myPreset||{}; o.myPreset[me]=Object.assign(ownPresets,o.myPreset[me]||{});
+  const batch=fbDb.batch();
+  batch.set(libRef(),{songs:JSON.stringify(o.songs||[]), bandName:(o.settings&&o.settings.bandName)||'Who Knows?', updated:Date.now()});
+  (o.setlists||[]).forEach(sl=>{ const c=Object.assign({},sl,{owner:sl.owner||me}); batch.set(setsCol().doc(c.id),setDocData(c)); });
+  const people=new Set([...Object.keys(o.myNotes||{}),...Object.keys(o.myCtrl||{}),...Object.keys((o.settings||{}).pdfUser||{}),...Object.keys(o.myPreset||{})]);
+  people.forEach(m=>{ batch.set(fbDb.collection('setlistNotes').doc(m),{notes:JSON.stringify((o.myNotes||{})[m]||{}),ctrl:JSON.stringify((o.myCtrl||{})[m]||{}),pdf:JSON.stringify(((o.settings||{}).pdfUser||{})[m]||null),preset:JSON.stringify((o.myPreset||{})[m]||{}),updated:Date.now()}); });
+  await batch.commit();
+  if((o.setlists||[]).length||(o.songs||[]).length) toast('Bisherige Setlisten & Songs übernommen ✓');
+}
+function rmRerender(){ if(!document.activeElement||!document.activeElement.matches('input,textarea')) render(); else pendingRender=true; }
+function rmSubscribe(){
+  const err=e=>{ console.warn(e); setStatus(e&&e.code==='permission-denied'?'Keine Berechtigung – Firestore-Regeln aktuell? (README 9.3)':'Verbindung gestört'); };
+  libRef().onSnapshot(snap=>{
+    if(snap.metadata&&snap.metadata.hasPendingWrites) return;
+    const d=snap.exists?snap.data():{};
+    let songs=[]; try{ songs=JSON.parse(d.songs||'[]'); }catch(e){}
+    const j=JSON.stringify({songs,bandName:d.bandName||'Who Knows?'});
+    if(j===rmLastLib||dirty) return;
+    rmLastLib=j; state.songs=songs; state.settings.bandName=d.bandName||'Who Knows?';
+    if(RM.owner&&songs.some(x=>x.preset)){ rmPendingPresets=true; }
+    if(rmPendingPresets&&rmNotesLoaded){ rmPendingPresets=false; if(movePresetsTo(me)) commit(false); }
+    setStatus('Angemeldet als '+me+' ✓'); rmRerender();
+  },err);
+  const q=RM.others?setsCol():setsCol().where('owner','==',me);
+  q.onSnapshot(snap=>{
+    if(snap.metadata&&snap.metadata.hasPendingWrites) return;
+    if(dirty) return;
+    const list=[], last={}, meta={};
+    snap.docs.forEach(doc=>{ const d=doc.data(); let sl=null; try{ sl=JSON.parse(d.data); }catch(e){} if(!sl) return;
+      sl.id=doc.id; sl.owner=d.owner; sl.from=d.from||sl.from||''; if(!Array.isArray(sl.items)) sl.items=[];
+      list.push(sl); last[doc.id]=JSON.stringify(sl); meta[doc.id]={owner:d.owner,from:d.from||''}; });
+    state.setlists=list; rmLastSet=last; rmSetMeta=meta; rmRerender();
+  },err);
+  notesRef().onSnapshot(snap=>{
+    if(snap.metadata&&snap.metadata.hasPendingWrites) return;
+    if(dirty) return;
+    const d=snap.exists?snap.data():{};
+    const P=(x,def)=>{ try{ const v=JSON.parse(x); return v==null?def:v; }catch(e){ return def; } };
+    state.myNotes={[me]:P(d.notes,{})}; state.myCtrl={[me]:P(d.ctrl,{})}; state.myPreset={[me]:P(d.preset,{})};
+    const pdf=P(d.pdf,null); state.settings.pdfUser=pdf?{[me]:pdf}:{};
+    rmNotesLoaded=true;
+    if(rmPendingPresets){ rmPendingPresets=false; setTimeout(()=>{ if(movePresetsTo(me)) commit(false); },0); }
+    rmLastNotes=JSON.stringify([state.myNotes[me],state.myCtrl[me],pdf,state.myPreset[me]]); rmRerender();
+  },err);
+}
+async function rmFlush(){
+  if(rmSaving){ rmAgain=true; return; }
+  rmSaving=true; setStatus('Speichere …');
+  try{
+    const libJ=JSON.stringify({songs:state.songs,bandName:state.settings.bandName});
+    if(libJ!==rmLastLib){ await libRef().set({songs:JSON.stringify(state.songs),bandName:state.settings.bandName,updated:Date.now()}); rmLastLib=libJ; }
+    const ids=new Set();
+    for(const sl of state.setlists){
+      ids.add(sl.id);
+      if(!sl.owner) sl.owner=me;
+      if(isRO(sl)) continue;
+      const j=JSON.stringify(sl);
+      if(rmLastSet[sl.id]!==j){ await setsCol().doc(sl.id).set(setDocData(sl)); rmLastSet[sl.id]=j; rmSetMeta[sl.id]={owner:sl.owner,from:sl.from||''}; }
+    }
+    for(const id of Object.keys(rmLastSet)){
+      if(ids.has(id)) continue;
+      const m=rmSetMeta[id]||{};
+      if(RM.owner||m.owner===me||m.from===me){ await setsCol().doc(id).delete(); }
+      delete rmLastSet[id]; delete rmSetMeta[id];
+    }
+    const pdf=(state.settings.pdfUser||{})[me]||null;
+    const nj=JSON.stringify([(state.myNotes||{})[me]||{},(state.myCtrl||{})[me]||{},pdf,(state.myPreset||{})[me]||{}]);
+    if(nj!==rmLastNotes){ await notesRef().set({notes:JSON.stringify((state.myNotes||{})[me]||{}),ctrl:JSON.stringify((state.myCtrl||{})[me]||{}),pdf:JSON.stringify(pdf),preset:JSON.stringify((state.myPreset||{})[me]||{}),updated:Date.now()}); rmLastNotes=nj; }
+    setStatus('Gespeichert ✓');
+  }catch(e){
+    console.warn(e);
+    setStatus(e&&e.code==='permission-denied'?'Keine Berechtigung zum Speichern':'Nicht gespeichert – Verbindung?');
+  }
+  rmSaving=false; dirty=false;
+  if(rmAgain){ rmAgain=false; rmFlush(); }
+}
+async function rmAssign(sl,who){
+  const fresh=()=>sl.items.map(it=>it.type==='break'?{id:uid(),type:'break',kind:it.kind||(isEncore(it)?'encore':'break'),label:it.label}:{id:uid(),type:'song',songId:it.songId,note:''});
+  const ok=[],bad=[];
+  for(const n of who){
+    const c={id:sl.id+'__'+n,owner:n,from:me,sourceId:sl.id,name:sl.name,date:sl.date,venue:sl.venue,items:fresh(),created:Date.now(),assigned:Date.now()};
+    try{ await setsCol().doc(c.id).set(setDocData(c)); ok.push(n); }catch(e){ console.warn(e); bad.push(n); }
+  }
+  toast((ok.length?'Zugewiesen an '+ok.join(', '):'')+(bad.length?(ok.length?' · ':'')+'Nicht möglich bei: '+bad.join(', '):''));
+}
+
+let pendingRender=false;
+document.addEventListener('focusout',()=>{ if(pendingRender){ pendingRender=false; setTimeout(()=>{ if(!document.activeElement.matches('input,textarea')) render(); },0);} });
+
+let dlNs;
+async function downloadsNs(){ if(dlNs!==undefined) return dlNs; try{ dlNs=(window.claude&&window.claude.use)?await window.claude.use('downloads'):null; }catch(e){dlNs=null;} return dlNs; }
+async function saveFile(filename,data,mime){
+  const dl=await downloadsNs();
+  if(dl){
+    try{ await dl.save({filename,data}); toast('Gespeichert: '+filename); return true; }
+    catch(e){ if(e&&e.code==='declined') return false; }
+  }
+  // Fallback, z. B. wenn die Datei direkt im Browser geöffnet wird
+  try{
+    const blob=data instanceof Blob?data:new Blob([data],{type:mime||'application/octet-stream'});
+    const u=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=u; a.download=filename;
+    a.rel='noopener'; a.style.display='none'; document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(u); },30000);
+    if(!dl){ dlNs=false; toast('Gespeichert: '+filename); return true; }
+  }catch(e){}
+  return false;
+}
+
+/* ---------- UI primitives ---------- */
+let toastT;
+function toast(msg){ clearTimeout(toastT); let el=$('#toast'); if(!el){el=document.createElement('div');el.id='toast';el.className='toast';document.body.appendChild(el);} el.textContent=msg; el.style.display='block'; toastT=setTimeout(()=>el.style.display='none',2600); }
+function modal(html,onMount,sticky){
+  const bg=document.createElement('div'); bg.className='modal-bg';
+  bg.innerHTML=`<div class="modal">${html}</div>`;
+  if(!sticky) bg.addEventListener('mousedown',e=>{ if(e.target===bg) close(); });
+  function close(){ bg.remove(); document.removeEventListener('keydown',key); }
+  function key(e){ if(e.key==='Escape'&&!sticky) close(); }
+  document.addEventListener('keydown',key);
+  $('#layer').appendChild(bg); if(onMount) onMount(bg.querySelector('.modal'),close);
+  const f=bg.querySelector('[autofocus]'); if(f) f.focus();
+  return close;
+}
+function ask(msg,ok){ return new Promise(res=>{ modal(`<h2>Sicher?</h2><p>${msg}</p><div class="mfoot"><button class="btn" data-x="0">Abbrechen</button><button class="btn pri" data-x="1">${esc(ok||'OK')}</button></div>`,(m,close)=>{ m.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{close();res(b.dataset.x==='1');}); }); }); }
+
+/* ---------- render ---------- */
+function render(){
+  const w=$('#who');
+  if(w&&RM){
+    $('#whoLabel').textContent=RM.others?'Setlisten von':'Angemeldet:';
+    w.innerHTML=RM.others?`<option value="">${esc(me)} (ich)</option>`+MEMBERS.filter(n=>n!==me).map(n=>`<option value="${esc(n)}" ${ui.viewOwner===n?'selected':''}>${esc(n)}</option>`).join('')+`<option value="*" ${ui.viewOwner==='*'?'selected':''}>Alle</option>`:`<option>${esc(me)}</option>`;
+    w.disabled=!RM.others;
+  } else if(w){ w.innerHTML=(me?'':'<option value="">–</option>')+MEMBERS.map(n=>`<option ${n===me?'selected':''}>${n}</option>`).join(''); }
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===ui.tab));
+  if(ui.tab==='sets') renderSets(); else if(ui.tab==='songs') renderSongs(); else renderSettings();
+}
+
+function viewName(){ return RM&&ui.viewOwner?(ui.viewOwner==='*'?'allen':ui.viewOwner):(me||'…'); }
+function asideHtml(){ return `<div class="card aside" id="asideBox"><h3>Setlisten von ${esc(viewName())}</h3>
+    <button class="btn pri" style="width:100%;margin-bottom:10px" data-act="newSet">+ Neue Setliste</button>
+    ${sortedSets().map(s=>{const st=setStats(s);return `<button class="setlink ${s.id===ui.setId?'on':''}" data-act="pickSet" data-id="${s.id}"><b>${esc(s.name||'Ohne Namen')}</b>${RM&&ui.viewOwner==='*'?`<span class="fromtag owntag">${esc(s.owner||'')}</span>`:''}${s.from?`<span class="fromtag">von ${esc(s.from)}</span>`:''}<small>${[fmtDate(s.date),s.venue].filter(Boolean).map(esc).join(' · ')||'&nbsp;'}<br>${st.n} Songs${st.t?' · '+fmtDur(st.t):''}</small></button>`;}).join('')||'<div class="stats">Noch keine Setliste.</div>'}
+  </div>`;
+}
+function renderSets(){
+  { const vs=sortedSets(); if(!curSet()) ui.setId=vs.length?vs[0].id:null; }
+  const sl=curSet();
+  const aside=asideHtml();
+  let mid,right='';
+  if(!sl&&RM&&ui.viewOwner){
+    mid=`<div class="card"><div class="empty">${esc(viewName()==='allen'?'Es gibt noch keine Setlisten.':viewName()+' hat noch keine Setlisten.')}</div></div>`;
+  } else if(!sl){
+    mid=`<div class="card"><div class="empty"><p style="font-size:18px;color:var(--text);margin:0 0 6px">Los geht’s</p><p style="margin:0 0 14px">Leg eine Setliste an und füg Songs hinzu. Songs, die noch nicht in deiner Song-Liste sind, kannst du direkt beim Suchen anlegen.</p><button class="btn pri" data-act="newSet">+ Erste Setliste anlegen</button></div></div>`;
+  } else {
+    const st=setStats(sl);
+    let nr=0,seg=0,segN=0,setNo=1; const rows=[];
+    sl.items.forEach((it,i)=>{
+      if(it.type==='break'){
+        const enc=isEncore(it);
+        rows.push(`<li class="it brk ${enc?'enc':''}" style="--sc:${enc?'#c0532f':'#d9a441'}" data-i="${i}">${enc?'<span class="star">★</span>':''}<span class="handle" title="Ziehen">⋮⋮</span><div class="main"><input type="text" value="${esc(it.label||'Pause')}" data-edit="label" data-i="${i}"></div><span class="sub">Set ${setNo}: ${segN} Songs${seg?' · '+fmtDur(seg):''}</span><div class="acts"><button class="ico" data-act="up" data-i="${i}" title="Nach oben" aria-label="Nach oben">↑</button><button class="ico" data-act="down" data-i="${i}" title="Nach unten" aria-label="Nach unten">↓</button><button class="ico del" data-act="rm" data-i="${i}" title="Entfernen" aria-label="Entfernen">✕</button></div></li>`);
+        seg=0;segN=0;setNo++; return;
+      }
+      const s=songById(it.songId); if(!s){ rows.push(`<li class="it" data-i="${i}"><span class="handle">⋮⋮</span><div class="main"><span class="a">(gelöschter Song)</span></div><button class="ico" data-act="rm" data-i="${i}">✕</button></li>`); return; }
+      nr++; segN++; seg+=s.dur||0;
+      const chips=[s.key&&`<span class="chip">${esc(s.key)}</span>`,myPreset(s.id)&&`<span class="chip p" title="Nur für dich sichtbar">Preset ${esc(myPreset(s.id))}</span>`,s.tuning&&`<span class="chip">${esc(s.tuning)}</span>`,s.bpm&&`<span class="chip">${esc(s.bpm)} BPM</span>`,s.dur&&`<span class="chip">${fmtDur(s.dur)}</span>`].filter(Boolean).join('');
+      rows.push(`<li class="it" data-i="${i}"><span class="handle" title="Ziehen">⋮⋮</span><span class="nr">${nr}</span><div class="main"><div class="t">${esc(s.title)} ${s.artist?`<span class="a">– ${esc(s.artist)}</span>`:''}</div>${chips?`<div class="chips">${chips}</div>`:''}<input type="text" class="note" placeholder="Notiz nur für diesen Gig (z. B. Ansage, Medley)…" value="${esc(it.note||'')}" data-edit="note" data-i="${i}">${myNoteUi(s,it)}</div><div class="acts"><button class="ico" data-act="editSong" data-id="${s.id}" title="Song bearbeiten" aria-label="Song bearbeiten">✎</button><button class="ico" data-act="up" data-i="${i}" title="Nach oben" aria-label="Nach oben">↑</button><button class="ico" data-act="down" data-i="${i}" title="Nach unten" aria-label="Nach unten">↓</button><button class="ico del" data-act="rm" data-i="${i}" title="Aus Setliste entfernen" aria-label="Aus Setliste entfernen">✕</button></div></li>`);
+    });
+    const hasBreak=sl.items.some(i=>i.type==='break');
+    const ro=isRO(sl);
+    mid=`<div class="card ${ro?'ro':''}">
+      ${ro?`<div class="robar"><span>👀 Setliste von <b>${esc(sl.owner)}</b> – nur ansehen. Deine eigenen Notizen &amp; CTRL kannst du trotzdem eintragen.</span><button class="btn sm" data-act="copyMine">⧉ Kopie für mich</button></div>`:''}
+      <div class="setpick">
+        <select id="setPick" aria-label="Setliste wählen">${sortedSets().map(x=>`<option value="${x.id}" ${x.id===sl.id?'selected':''}>${esc(x.name||'Ohne Namen')}${x.date?' · '+fmtDate(x.date):''}${x.from?' (von '+esc(x.from)+')':''}</option>`).join('')}</select>
+        <button class="btn" data-act="newSet" aria-label="Neue Setliste">+ Neu</button>
+      </div>
+      <div class="fields">
+        <div><label class="f">Name</label><input type="text" data-set="name" value="${esc(sl.name)}" placeholder="z. B. Stadtfest Sommer"></div>
+        <div><label class="f">Datum</label><input type="date" data-set="date" value="${esc(sl.date||'')}"></div>
+        <div><label class="f">Ort / Location</label><input type="text" data-set="venue" value="${esc(sl.venue||'')}" placeholder="z. B. Jugendzentrum"></div>
+      </div>
+      <div class="toolbar">
+        <button class="btn pri" data-act="pdf">🖨 <span class="desk">Drucken / </span>PDF</button>
+        <button class="btn" data-act="stage">🎤 Bühne<span class="desk">nansicht</span></button>
+        <button class="btn sec" data-act="assign">👥 An Mitglieder zuweisen</button>
+        <button class="btn sec" data-act="copyText">📋 Als Text kopieren</button>
+        <button class="btn sec" data-act="bulk">📥 Liste einfügen</button>
+        <button class="btn sec" data-act="dupSet">⧉ Duplizieren</button>
+        <button class="btn sec danger" data-act="delSet">🗑 Löschen</button>
+        <button class="btn morebtn" data-act="more" aria-label="Weitere Aktionen">⋯</button>
+      </div>
+      <p class="stats"><b>${st.n}</b> Songs${st.t?` · Gesamt <b>${fmtDur(st.t)}</b>`:''}${hasBreak&&st.t?` (+ Pausen)`:''}${st.missing&&st.n?` · bei ${st.missing} Song${st.missing>1?'s':''} fehlt die Länge`:''}</p>
+      ${rows.length?`<ol class="items" id="items">${rows.join('')}</ol>`:`<div class="empty">Noch leer – <span class="desk">rechts Songs anklicken</span><span class="mob">unten auf „+ Songs hinzufügen“ tippen</span>, um Songs hinzuzufügen.</div>`}
+      <div class="row" style="margin-top:10px"><button class="btn sm" data-act="addBreak">+ Pause</button><button class="btn sm encbtn" data-act="addEncore">★ + Zugabe</button></div>
+    </div>`;
+    right=`<div class="card"><h3>Songs hinzufügen</h3>
+      <input type="search" id="addQ" placeholder="Song suchen oder neu anlegen…" value="${esc(ui.addQ)}">
+      <div class="lib" id="lib">${libList(sl)}</div></div>`;
+  }
+  if(sl&&isRO(sl)) right='';
+  $('#app').innerHTML=`<div class="grid3">${aside}${mid}${right||'<div></div>'}</div>${sl&&!isRO(sl)?'<button class="fab" data-act="addSheet">+ Songs hinzufügen</button>':''}`;
+  const sp=$('#setPick'); if(sp) sp.onchange=()=>{ ui.setId=sp.value; render(); window.scrollTo(0,0); };
+  const q=$('#addQ'); if(q){ q.oninput=()=>{ui.addQ=q.value; $('#lib').innerHTML=libList(curSet());}; q.onkeydown=e=>{ if(e.key==='Enter'){ const first=$('#lib [data-act]'); if(first) first.click(); } }; }
+  const list=$('#items');
+  if(list && window.Sortable && !isRO(sl)){
+    Sortable.create(list,{handle:'.handle',animation:150,onEnd:e=>{ if(e.oldIndex===e.newIndex) return; const s=curSet(); const it=s.items.splice(e.oldIndex,1)[0]; s.items.splice(e.newIndex,0,it); commit(); }});
+  }
+}
+function myNoteUi(s,it){
+  if(!me) return '';
+  const mn=myNote(s.id);
+  if(ui.openNote===it.id) return `<div class="myrow"><label class="ctrlbox"><span>CTRL</span><input type="text" data-ctrl="${s.id}" value="${esc(myCtrl(s.id))}" placeholder="–"></label></div><textarea class="mynote" data-my="${s.id}" rows="${Math.max(4,mn.split('\n').length+1)}" placeholder="Akkorde, Riffs, Einsätze …&#10;z. B.  Am  G  F  G  (Strophe)&#10;nur für dich, gilt in allen Setlisten">${esc(mn)}</textarea><button class="mylink" data-act="closeNote">✓ Fertig</button>`;
+  const first=mn.split('\n')[0];
+  return `<div class="myrow"><label class="ctrlbox" title="Wann brauchst du den CTRL-Schalter? Steht im PDF rot und fett am Ende der Notizen."><span>CTRL</span><input type="text" data-ctrl="${s.id}" value="${esc(myCtrl(s.id))}" placeholder="–"></label><button class="mylink" data-act="openNote" data-id="${it.id}">${mn?'📝 '+esc(first.slice(0,70))+(mn.includes('\n')||first.length>70?' …':''):'+ Meine Notizen / Akkorde'}</button></div>`;
+}
+function libList(sl){
+  const q=ui.addQ.trim().toLowerCase();
+  const inSet=new Set(sl.items.filter(i=>i.type==='song').map(i=>i.songId));
+  let songs=state.songs.filter(s=>!q||(s.title+' '+(s.artist||'')).toLowerCase().includes(q)).sort((a,b)=>a.title.localeCompare(b.title,'de'));
+  let html=songs.map(s=>`<div class="libit" data-act="addSong" data-id="${s.id}"><div class="main"><div class="t">${esc(s.title)}</div><small>${esc([s.artist,s.key,myPreset(s.id)&&'P '+myPreset(s.id)].filter(Boolean).join(' · '))}</small></div>${inSet.has(s.id)?'<span class="in" title="Schon in der Setliste">✓</span>':'<span class="plus">+</span>'}</div>`).join('');
+  if(q && !state.songs.some(s=>s.title.toLowerCase()===q)) html=`<div class="libit" data-act="quickNew"><div class="main"><div class="t">„${esc(ui.addQ.trim())}“ neu anlegen</div><small>und zur Setliste hinzufügen</small></div><span class="plus">+</span></div>`+html;
+  if(!state.songs.length && !q) html=`<div class="stats" style="padding:8px">Deine Song-Liste ist noch leer. Tipp einen Titel ein oder nutz „Liste einfügen“, um viele Songs auf einmal anzulegen.</div>`;
+  return html;
+}
+
+function renderSongs(){
+  const q=ui.songQ.trim().toLowerCase();
+  const key=ui.songSort;
+  let songs=state.songs.filter(s=>!q||[s.title,s.artist,s.key,myPreset(s.id),s.tuning,s.notes].join(' ').toLowerCase().includes(q));
+  songs.sort((a,b)=>{ if(key==='dur'||key==='bpm') return (+a[key]||0)-(+b[key]||0); return String(a[key]||'').localeCompare(String(b[key]||''),'de',{numeric:true}); });
+  const th=(k,l,c)=>`<th class="${c||''}" data-sort="${k}" style="cursor:pointer">${l}${key===k?' ▾':''}</th>`;
+  $('#app').innerHTML=`<div class="card">
+    <div class="row" style="margin-bottom:12px"><input type="search" id="songQ" placeholder="Suchen…" value="${esc(ui.songQ)}" style="max-width:320px"><button class="btn pri" data-act="newSong">+ Song</button><button class="btn" data-act="bulk">Liste einfügen</button><span class="stats" style="margin:0 0 0 auto">${state.songs.length} Songs</span></div>
+    ${songs.length?`<table><thead><tr>${th('title','Titel')}${th('artist','Interpret','hide-s')}${th('key','Tonart')}${th('tuning','Stimmung','hide-s')}${th('bpm','BPM','hide-s')}${th('dur','Länge','hide-s')}<th class="hide-s">In Sets</th></tr></thead><tbody>
+      ${songs.map(s=>`<tr data-act="editSong" data-id="${s.id}"><td><b>${esc(s.title)}</b>${s.notes?`<div class="stats" style="margin:2px 0 0">${esc(s.notes)}</div>`:''}</td><td class="hide-s">${esc(s.artist)}</td><td>${esc(s.key)}</td><td class="hide-s">${esc(s.tuning)}</td><td class="hide-s">${esc(s.bpm)}</td><td class="hide-s">${fmtDur(s.dur)}</td><td class="hide-s">${usage(s.id)||''}</td></tr>`).join('')}
+    </tbody></table>`:`<div class="empty">${q?'Nichts gefunden.':'Noch keine Songs. Leg einzeln welche an oder füg eine ganze Liste auf einmal ein.'}</div>`}
+  </div>`;
+  const i=$('#songQ'); i.oninput=()=>{ ui.songQ=i.value; const pos=i.selectionStart; renderSongs(); const n=$('#songQ'); n.focus(); n.setSelectionRange(pos,pos); };
+  document.querySelectorAll('[data-sort]').forEach(t=>t.onclick=()=>{ ui.songSort=t.dataset.sort; renderSongs(); });
+}
+
+function renderSettings(){
+  $('#app').innerHTML=`<div style="max-width:620px;display:grid;gap:16px">
+    <div class="card"><h3>Band</h3><label class="f">Bandname (steht oben im PDF)</label><input type="text" id="bandName" value="${esc(state.settings.bandName)}"></div>
+    <div class="card"><h3>Backup</h3>
+      <p class="stats">Alles wird automatisch gespeichert. Für den Fall der Fälle kannst du zusätzlich eine Sicherungsdatei ziehen oder einspielen.</p>
+      <div class="row"><button class="btn" data-act="exportJson">Backup herunterladen</button><button class="btn" data-act="exportCsv">Songs als CSV</button>${!RM||RM.owner?'<label class="btn">Backup einspielen<input type="file" id="imp" accept=".json,application/json" hidden></label>':''}</div></div>
+  </div>`;
+  $('#bandName').oninput=e=>{ state.settings.bandName=e.target.value; commit(false); };
+  if($('#imp')) $('#imp').onchange=async e=>{
+    const f=e.target.files[0]; if(!f) return;
+    try{ const d=JSON.parse(await f.text()); if(!d||!Array.isArray(d.songs)) throw 0;
+      if(await ask(`Backup mit ${d.songs.length} Songs und ${(d.setlists||[]).length} Setlisten einspielen? Der aktuelle Stand wird ersetzt.`,'Einspielen')){
+        if(RM){ // persönliche Notizen aller Personen in ihre eigenen Dokumente
+          const people=new Set([...Object.keys(d.myNotes||{}),...Object.keys(d.myCtrl||{}),...Object.keys((d.settings||{}).pdfUser||{})]);
+          const batch=fbDb.batch();
+          Object.keys(d.myPreset||{}).forEach(m=>people.add(m));
+          people.forEach(m=>{ if(m===me) return; batch.set(fbDb.collection('setlistNotes').doc(m),{notes:JSON.stringify((d.myNotes||{})[m]||{}),ctrl:JSON.stringify((d.myCtrl||{})[m]||{}),pdf:JSON.stringify(((d.settings||{}).pdfUser||{})[m]||null),preset:JSON.stringify((d.myPreset||{})[m]||{}),updated:Date.now()}); });
+          try{ await batch.commit(); }catch(err){ console.warn(err); }
+          (d.setlists||[]).forEach(x=>{ if(!x.owner) x.owner=me; });
+          ui.viewOwner='*';
+        }
+        merge(d); ui.setId=null; commit(); toast('Backup eingespielt'); }
+    }catch(err){ toast('Das ist keine gültige Backup-Datei.'); }
+    e.target.value='';
+  };
+}
+
+/* ---------- song dialog ---------- */
+function songDialog(song,onSave){
+  const s=song||{title:'',artist:'',key:'',bpm:'',dur:0,tuning:'',notes:''};
+  const used=song?usage(song.id):0;
+  modal(`<h2>${song?'Song bearbeiten':'Neuer Song'}</h2>
+    <div class="mgrid">
+      <div class="full"><label class="f">Titel *</label><input type="text" name="title" value="${esc(s.title)}" autofocus></div>
+      <div class="full"><label class="f">Interpret / Original</label><input type="text" name="artist" value="${esc(s.artist)}"></div>
+      <div><label class="f">Tonart</label><input type="text" name="key" value="${esc(s.key)}" placeholder="z. B. Em"></div>
+      <div><label class="f">Mein Preset${me?' (nur für '+esc(me)+')':''}</label><input type="text" name="preset" value="${esc(song?myPreset(song.id):'')}" placeholder="z. B. 12-A"></div>
+      <div><label class="f">Stimmung</label><input type="text" name="tuning" value="${esc(s.tuning)}" placeholder="z. B. Standard, Drop D"></div>
+      <div><label class="f">Tempo (BPM)</label><input type="number" name="bpm" value="${esc(s.bpm)}" min="0"></div>
+      <div><label class="f">Länge (m:ss)</label><input type="text" name="dur" value="${fmtDur(s.dur)}" placeholder="3:45"></div>
+      <div class="full"><label class="f">Song-Notizen (sieht die ganze Band)</label><textarea name="notes" rows="2" placeholder="z. B. Einzähler 4, Schluss auf Zeichen">${esc(s.notes)}</textarea></div>
+      ${me?`<div class="full"><label class="f" style="color:#ff7a5c">CTRL – wann brauchst du den Schalter? (nur für ${esc(me)})</label><input type="text" name="myctrl" value="${esc(song?myCtrl(song.id):'')}" placeholder="z. B. Solo, Refrain, Solo 3x"></div>`:''}
+      ${me?`<div class="full"><label class="f">Meine Notizen / Akkorde (nur für ${esc(me)})</label><textarea name="mynote" class="mynote" rows="5" placeholder="z. B.&#10;Intro:   Am  G  F  G&#10;Refrain: C   G  Am F">${esc(song?myNote(song.id):'')}</textarea></div>`:''}
+    </div>
+    <div class="mfoot">${song?`<button class="btn danger left" data-x="del">Löschen</button>`:''}<button class="btn" data-x="cancel">Abbrechen</button><button class="btn pri" data-x="save">Speichern</button></div>`,(m,close)=>{
+    const val=n=>m.querySelector(`[name=${n}]`).value.trim();
+    const save=()=>{
+      const title=val('title'); if(!title){ m.querySelector('[name=title]').focus(); return; }
+      const data={title,artist:val('artist'),key:val('key'),tuning:val('tuning'),bpm:val('bpm'),dur:parseDur(val('dur')),notes:val('notes')};
+      let target=song;
+      if(target) Object.assign(target,data); else { target=Object.assign({id:uid()},data); state.songs.push(target); }
+      setMyPreset(target.id,val('preset')); delete target.preset;
+      const mnEl=m.querySelector('[name=mynote]'); if(mnEl) setMyNote(target.id,mnEl.value); const mcEl=m.querySelector('[name=myctrl]'); if(mcEl) setMyCtrl(target.id,mcEl.value);
+      close(); if(onSave) onSave(target); commit();
+    };
+    m.querySelector('[data-x=save]').onclick=save;
+    m.querySelector('[data-x=cancel]').onclick=close;
+    m.querySelectorAll('input').forEach(i=>i.addEventListener('keydown',e=>{ if(e.key==='Enter') save(); }));
+    const del=m.querySelector('[data-x=del]');
+    if(del) del.onclick=async()=>{ close(); if(await ask(`„${esc(song.title)}“ löschen?${used?` Der Song wird auch aus ${used} Setliste${used>1?'n':''} entfernt.`:''}`,'Löschen')){ state.songs=state.songs.filter(x=>x.id!==song.id); state.setlists.forEach(sl=>sl.items=sl.items.filter(i=>i.songId!==song.id)); commit(); } };
+  });
+}
+
+/* ---------- bulk import ---------- */
+function bulkDialog(){
+  const sl=ui.tab==='sets'?curSet():null;
+  modal(`<h2>Liste einfügen</h2>
+    <p class="stats">Ein Song pro Zeile. Nummern am Anfang werden ignoriert. Format: <b>Titel</b> oder <b>Titel - Interpret</b>, für mehr Details: <b>Titel | Interpret | Tonart | Preset | Länge</b></p>
+    <textarea rows="10" id="bulkTxt" autofocus placeholder="1. Zombie - The Cranberries&#10;2. Paranoid - Black Sabbath&#10;3. Ring of Fire | Social Distortion | G | 07 | 3:30"></textarea>
+    ${sl?`<label class="check"><input type="checkbox" id="bulkAdd" checked> Auch in dieser Reihenfolge zu „${esc(sl.name||'Setliste')}“ hinzufügen</label>`:''}
+    <p class="stats">Songs, die es schon gibt (gleicher Titel), werden nicht doppelt angelegt.</p>
+    <div class="mfoot"><button class="btn" data-x="c">Abbrechen</button><button class="btn pri" data-x="ok">Übernehmen</button></div>`,(m,close)=>{
+    m.querySelector('[data-x=c]').onclick=close;
+    m.querySelector('[data-x=ok]').onclick=()=>{
+      const add=sl&&m.querySelector('#bulkAdd').checked; let created=0,added=0;
+      m.querySelector('#bulkTxt').value.split(/\r?\n/).forEach(line=>{
+        line=line.replace(/^\s*\d+[.)\-:]?\s+/,'').trim(); if(!line) return;
+        if(/^(pause|break|---+|set\s*\d*|zugabe|encore)$/i.test(line)){ if(add){ const e=/zugabe|encore/i.test(line); sl.items.push({id:uid(),type:'break',kind:e?'encore':'break',label:e?'Zugabe':line.replace(/^-+$/,'Pause')}); } return; }
+        let title,artist='',key='',preset='',dur=0;
+        if(line.includes('|')){ const p=line.split('|').map(x=>x.trim()); [title,artist='',key='',preset='']=p; dur=parseDur(p[4]); }
+        else { const i=line.indexOf(' - '); if(i>0){title=line.slice(0,i).trim();artist=line.slice(i+3).trim();} else title=line; }
+        if(!title) return;
+        let s=findSongByTitle(title);
+        if(!s){ s={id:uid(),title,artist,key,tuning:'',bpm:'',dur,notes:''}; state.songs.push(s); created++; }
+        if(preset) setMyPreset(s.id,preset);
+        if(add){ sl.items.push({id:uid(),type:'song',songId:s.id,note:''}); added++; }
+      });
+      close(); commit(); toast(`${created} neue Songs angelegt${add?`, ${added} zur Setliste hinzugefügt`:''}`);
+    };
+  });
+}
+
+/* ---------- Handy: Mehr-Menü & Songs-hinzufügen-Fenster ---------- */
+function moreSheet(){
+  const items=[...document.querySelectorAll('#app .toolbar .sec')].filter(b=>!isRO(curSet())||b.dataset.act==='copyText');
+  modal(`<h2>Weitere Aktionen</h2><div class="sheetlist">${items.map((b,k)=>`<button class="btn sheetbtn ${b.classList.contains('danger')?'danger':''}" data-k="${k}">${b.innerHTML}</button>`).join('')}</div><div class="mfoot"><button class="btn" data-x="c">Schließen</button></div>`,(m,close)=>{
+    m.querySelector('[data-x=c]').onclick=close;
+    m.querySelectorAll('[data-k]').forEach(x=>x.onclick=()=>{ close(); doAct(items[+x.dataset.k]); });
+  });
+}
+function addSheet(){
+  const sl=curSet(); if(!sl) return;
+  modal(`<div class="sheethead"><h2>Songs hinzufügen</h2><button class="btn" data-x="c">Fertig</button></div>
+    <input type="search" id="addQ2" placeholder="Song suchen oder neu anlegen …" value="${esc(ui.addQ)}">
+    <p class="stats" id="addInfo" style="margin:6px 0 0">Antippen fügt den Song am Ende der Setliste an.</p>
+    <div class="lib sheetlib" id="lib2">${libList(sl)}</div>`,(m,close)=>{
+    m.closest('.modal-bg').classList.add('sheet');
+    const q=m.querySelector('#addQ2'), lib=m.querySelector('#lib2');
+    const refresh=()=>{ lib.innerHTML=libList(curSet()); };
+    q.oninput=()=>{ ui.addQ=q.value; refresh(); };
+    m.querySelector('[data-x=c]').onclick=()=>{ close(); render(); };
+    lib.addEventListener('click',e=>{
+      const b=e.target.closest('[data-act]'); if(!b) return;
+      if(b.dataset.act==='addSong'){
+        const s=songById(b.dataset.id); curSet().items.push({id:uid(),type:'song',songId:b.dataset.id,note:''}); commit();
+        m.querySelector('#addInfo').textContent=`✓ „${s?s.title:'Song'}“ hinzugefügt (jetzt ${setStats(curSet()).n} Songs)`;
+        refresh();
+      } else if(b.dataset.act==='quickNew'){
+        const t=ui.addQ.trim();
+        songDialog(null,s=>{ curSet().items.push({id:uid(),type:'song',songId:s.id,note:''}); ui.addQ=''; q.value=''; setTimeout(refresh,0); m.querySelector('#addInfo').textContent=`✓ „${s.title}“ angelegt und hinzugefügt`; });
+        setTimeout(()=>{ const ti=document.querySelector('.modal [name=title]'); if(ti) ti.value=t; },0);
+      }
+    });
+  });
+}
+
+/* ---------- zuweisen ---------- */
+function assignDialog(sl){
+  if(!me){ pickUser(true); return; }
+  const others=MEMBERS.filter(n=>n!==me);
+  const has=n=>RM?state.setlists.find(x=>x.id===sl.id+'__'+n):state.setlists.find(x=>x.owner===n&&x.sourceId===sl.id);
+  modal(`<h2>„${esc(sl.name||'Setliste')}“ zuweisen</h2>
+    ${RM?'<p class="stats">Wurde sie jemandem schon einmal von dir zugewiesen, wird seine Kopie auf diesen Stand gebracht.</p>':''}
+    <p class="stats">Die ausgewählten Mitglieder bekommen die Setliste in ihren Bereich – als leere Vorlage: gleiche Songs, Reihenfolge, Pausen und Zugabe, aber <b>ohne deine Notizen, Akkorde und CTRL-Hinweise</b>. Ihre eigenen Notizen zu den Songs bleiben bei ihnen erhalten.</p>
+    <label class="check" style="margin-bottom:8px"><input type="checkbox" id="allM"> <b>Alle</b></label>
+    <div class="mgrid" style="gap:0 14px">${others.map(n=>`<label class="check"><input type="checkbox" name="m" value="${esc(n)}"> ${esc(n)}${has(n)?' <span class="stats" style="margin:0">(hat sie schon – wird aktualisiert)</span>':''}</label>`).join('')}</div>
+    <div class="mfoot"><button class="btn" data-x="c">Abbrechen</button><button class="btn pri" data-x="ok">Zuweisen</button></div>`,(m,close)=>{
+    const boxes=[...m.querySelectorAll('[name=m]')];
+    m.querySelector('#allM').onchange=e=>boxes.forEach(b=>b.checked=e.target.checked);
+    m.querySelector('[data-x=c]').onclick=close;
+    m.querySelector('[data-x=ok]').onclick=()=>{
+      const who=boxes.filter(b=>b.checked).map(b=>b.value);
+      if(!who.length){ toast('Bitte mindestens ein Mitglied auswählen.'); return; }
+      if(RM){ close(); rmAssign(sl,who); return; }
+      const fresh=()=>sl.items.map(it=>it.type==='break'?{id:uid(),type:'break',kind:it.kind||(isEncore(it)?'encore':'break'),label:it.label}:{id:uid(),type:'song',songId:it.songId,note:''});
+      let neu=0,upd=0;
+      who.forEach(n=>{
+        const ex=has(n);
+        if(ex){ Object.assign(ex,{name:sl.name,date:sl.date,venue:sl.venue,items:fresh(),from:me,assigned:Date.now()}); upd++; }
+        else { state.setlists.push({id:uid(),owner:n,from:me,sourceId:sl.id,name:sl.name,date:sl.date,venue:sl.venue,items:fresh(),created:Date.now(),assigned:Date.now()}); neu++; }
+      });
+      close(); commit(false);
+      toast(`Zugewiesen an ${who.join(', ')}`+(upd?` (${upd}× aktualisiert)`:''));
+    };
+  });
+}
+
+/* ---------- text / pdf ---------- */
+function setAsText(sl){
+  let nr=0; const lines=[`${state.settings.bandName} – ${sl.name||'Setliste'}`];
+  const sub=[fmtDate(sl.date),sl.venue].filter(Boolean).join(', '); if(sub) lines.push(sub); lines.push('');
+  sl.items.forEach(it=>{ if(it.type==='break'){ lines.push('', `--- ${it.label||'Pause'} ---`, ''); return; } const s=songById(it.songId); if(!s) return; nr++; lines.push(`${nr}. ${s.title}${s.artist?' ('+s.artist+')':''}${it.note?' – '+it.note:''}`); });
+  const st=setStats(sl); lines.push('', `${st.n} Songs${st.t?', ca. '+fmtDur(st.t):''}`);
+  return lines.join('\n');
+}
+function pdfSafe(t){ return String(t||'').replace(/[“”„«»]/g,'"').replace(/[‘’‚‹›]/g,"'").replace(/[–—]/g,'-').replace(/…/g,'...').replace(/\t/g,'    ').replace(/\r/g,'').replace(/[^\n\x20-\x7E\xA0-\xFF]/g,''); }
+const FONT_ANTON="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";
+const FONT_MONO="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";
+function pdfStar(doc,cx,cy,r){ const pts=[]; for(let k=0;k<10;k++){ const a=-Math.PI/2+k*Math.PI/5, rr=k%2?r*0.45:r; pts.push([cx+rr*Math.cos(a),cy+rr*Math.sin(a)]); }
+  doc.lines(pts.slice(1).map((pt,i)=>[pt[0]-pts[i][0],pt[1]-pts[i][1]]),pts[0][0],pts[0][1],[1,1],'F',true); }
+function isEncore(it){ return it.kind==='encore'||(!it.kind&&/zugabe|encore/i.test(it.label||'')); }
+function buildPdf(sl,o){
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'pt',format:'a4'});
+  let TF='helvetica',TS='bold',NF='courier',NS='bold';
+  try{ doc.addFileToVFS('Anton.ttf',FONT_ANTON); doc.addFont('Anton.ttf','Anton','normal'); doc.addFileToVFS('Mono.ttf',FONT_MONO); doc.addFont('Mono.ttf','Mono','normal'); TF='Anton';TS='normal';NF='Mono';NS='normal'; }catch(e){}
+  const W=595.28,H=841.89,M=28,col=o.color!==false;
+  const C=col?{dark:[28,21,17],cream:[239,230,214],rust:[181,71,43],gold:[205,150,52],ink:[30,24,20],meta:[125,100,82],alt:[246,240,231],rule:[214,200,182],ctrl:[205,25,25]}
+             :{dark:[0,0,0],cream:[255,255,255],rust:[0,0,0],gold:[90,90,90],ink:[0,0,0],meta:[90,90,90],alt:[243,243,243],rule:[200,200,200],ctrl:[0,0,0]};
+  const band=pdfSafe(state.settings.bandName);
+  const sub=[fmtDate(sl.date),sl.venue].filter(Boolean).map(pdfSafe).join('  ·  ');
+  // Kopf
+  const HH=70;
+  if(col){ doc.setFillColor(...C.dark); doc.rect(0,0,W,HH,'F'); doc.setFillColor(...C.rust); doc.rect(0,HH,W,3,'F'); }
+  doc.setFont(TF,TS); doc.setFontSize(30); doc.setTextColor(...(col?C.cream:C.ink)); doc.text(band,M,44);
+  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...C.gold); doc.text('ROCK  ·  BLUES  ·  COUNTRY',M+1,58,{charSpace:1.2});
+  doc.setFont(TF,TS); doc.setFontSize(17); doc.setTextColor(...(col?C.cream:C.ink)); doc.text(pdfSafe(sl.name||'Setliste').toUpperCase(),W-M,40,{align:'right'});
+  doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(...C.gold); if(sub) doc.text(sub,W-M,56,{align:'right'});
+  if(!col){ doc.setDrawColor(0); doc.setLineWidth(1.5); doc.line(M,HH,W-M,HH); }
+  const two=o.layout==='notes';
+  const top=HH+3+(two?20:14), bottom=H-M-14, avail=bottom-top;
+  const split=two?M+(W-2*M)*0.47:W-M;
+  const leftR=two?split-8:W-M, rightX=split+9, rightW=W-M-rightX;
+  let enc=false,idx=0;
+  const rows=sl.items.map(it=>{
+    if(it.type==='break'){ const e=isEncore(it); if(e) enc=true; idx=0; return o.breaks?{brk:true,enc:e,label:it.label||(e?'Zugabe':'Pause')}:null; }
+    const s=songById(it.songId); if(!s) return null;
+    const meta=[o.key&&s.key,o.preset&&myPreset(s.id)&&('P '+myPreset(s.id)),o.tuning&&s.tuning,o.bpm&&s.bpm&&(s.bpm+' BPM'),o.dur&&fmtDur(s.dur)].filter(Boolean).join(' · ');
+    const parts=[o.myNotes&&myNote(s.id),o.gigNotes&&it.note,o.songNotes&&s.notes].filter(x=>x&&String(x).trim());
+    const ctrl=o.ctrl&&myCtrl(s.id)?pdfSafe('CTRL: '+myCtrl(s.id).trim()):'';
+    return {title:s.title,artist:o.artist?s.artist:'',meta,enc,ctrl,alt:(idx++)%2===1,
+      note:two?'':parts.join('  ·  ').replace(/\s*\n\s*/g,' / '),right:two?parts.join('\n'):''}; }).filter(Boolean);
+  const metaFs=fs=>Math.max(7,Math.min(10,fs*0.45));
+  function layout(fs,nfs){
+    let h=0;
+    rows.forEach(r=>{
+      if(r.brk){ r._h=fs*0.95; h+=r._h; return; }
+      let rh=fs*1.2+((r.note||r.ctrl)&&!two?Math.max(8,fs*0.42)*1.3:0);
+      r._lines=null; r._ctrlSame=false;
+      if(two&&(r.right||r.ctrl)){ doc.setFont(NF,NS); doc.setFontSize(nfs);
+        r._lines=r.right?doc.splitTextToSize(pdfSafe(r.right),rightW):[];
+        let n=r._lines.length;
+        if(r.ctrl){ const cw=doc.getTextWidth(r.ctrl); if(n&&doc.getTextWidth(r._lines[n-1])+doc.getTextWidth('   ')+cw<=rightW) r._ctrlSame=true; else n++; }
+        rh=Math.max(rh,n*nfs*1.13+nfs*0.55); }
+      r._h=rh; h+=rh; });
+    return h;
+  }
+  const maxFs={auto:36,l:26,m:19}[o.size]||36;
+  let fs=maxFs,nfs=Math.max(10.5,Math.min(14,fs*0.6));
+  while(fs>11 && layout(fs,nfs)>avail){ fs-=0.25; nfs=Math.max(10.5,Math.min(14,fs*0.6)); }
+  while(nfs>8.5 && layout(fs,nfs)>avail){ nfs-=0.25; }
+  layout(fs,nfs);
+  if(two){ doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...C.meta); doc.text('NOTIZEN',rightX,top-6,{charSpace:1}); doc.text('SONG',M+1,top-6,{charSpace:1}); }
+  let y=top,nr=0;
+  const numW=o.numbers?fs*1.05:0;
+  rows.forEach(r=>{
+    const rh=r._h;
+    if(y+rh>bottom+1){ doc.addPage(); y=M; }
+    if(r.brk){
+      const lbl=pdfSafe(r.label).toUpperCase(), bh=rh*0.78, by=y+(rh-bh)/2;
+      doc.setFillColor(...(r.enc?C.rust:C.dark)); doc.roundedRect(M,by,W-2*M,bh,2,2,'F');
+      doc.setFont(TF,TS); doc.setFontSize(bh*0.62); const cs=bh*0.1;
+      const tw=doc.getTextWidth(lbl)+cs*(lbl.length-1), tx=W/2-tw/2;
+      doc.setTextColor(...(r.enc?C.cream:C.gold)); doc.text(lbl,tx,by+bh*0.73,{charSpace:cs});
+      if(r.enc){ doc.setFillColor(...C.cream); const sr=bh*0.2; pdfStar(doc,tx-sr*2.4,by+bh/2,sr); pdfStar(doc,tx+tw+sr*2.4,by+bh/2,sr); }
+      y+=rh; return;
+    }
+    nr++;
+    if(r.alt){ doc.setFillColor(...C.alt); doc.rect(M,y,W-2*M,rh,'F'); }
+    const base=y+fs*0.98;
+    if(o.numbers){ doc.setFont(TF,TS); doc.setFontSize(fs*0.62); doc.setTextColor(...(r.enc?C.rust:(col?C.rust:C.meta))); doc.text(String(nr),M+numW-fs*0.25,base,{align:'right'}); }
+    let metaW=0;
+    if(r.meta){ doc.setFont('helvetica','bold'); doc.setFontSize(metaFs(fs)); doc.setTextColor(...C.meta); metaW=doc.getTextWidth(pdfSafe(r.meta))+8; doc.text(pdfSafe(r.meta),leftR-3,base,{align:'right'}); }
+    const x0=M+numW+(o.numbers?0:6), maxW=leftR-metaW-x0;
+    let tfs=fs; doc.setFont(TF,TS); doc.setFontSize(tfs);
+    const title=pdfSafe(r.title).toUpperCase();
+    while(tfs>8 && doc.getTextWidth(title)>maxW){ tfs-=0.25; doc.setFontSize(tfs); }
+    doc.setTextColor(...C.ink); doc.text(title,x0,base);
+    if(r.artist){ const tw=doc.getTextWidth(title); doc.setFont('helvetica','normal'); doc.setFontSize(metaFs(fs)); doc.setTextColor(...C.meta); const rest=maxW-tw-6; if(rest>30){ let a=pdfSafe(r.artist); while(a.length>3&&doc.getTextWidth(a)>rest) a=a.slice(0,-4)+'...'; doc.text(a,x0+tw+6,base); } }
+    if(!two&&(r.note||r.ctrl)){ const f=Math.max(8,fs*0.42), ny=base+f*1.25; doc.setFont(NF,NS); doc.setFontSize(f);
+      let nx=x0; if(r.note){ let t=pdfSafe(r.note); const room=leftR-x0-(r.ctrl?doc.getTextWidth(r.ctrl)+12:0); while(t.length>4&&doc.getTextWidth(t)>room) t=t.slice(0,-4)+'...'; doc.setTextColor(...C.ink); doc.text(t,x0,ny); nx=x0+doc.getTextWidth(t)+12; }
+      if(r.ctrl){ doc.setTextColor(...C.ctrl); doc.text(r.ctrl,nx,ny); } }
+    if(two){
+      const ly0=y+nfs*0.25+nfs*0.9;
+      if(r._lines&&r._lines.length){ doc.setFont(NF,NS); doc.setFontSize(nfs); doc.setTextColor(...C.ink);
+        doc.text(r._lines,rightX,ly0,{lineHeightFactor:1.13}); }
+      if(r.ctrl){ doc.setFont(NF,NS); doc.setFontSize(nfs); doc.setTextColor(...C.ctrl); const n=r._lines.length;
+        if(r._ctrlSame) doc.text(r.ctrl,rightX+doc.getTextWidth(r._lines[n-1]+'   '),ly0+(n-1)*nfs*1.13);
+        else doc.text(r.ctrl,rightX,ly0+n*nfs*1.13); }
+      doc.setDrawColor(...C.rule); doc.setLineWidth(0.6); doc.line(split,y+2,split,y+rh-2);
+    }
+    y+=rh;
+  });
+  const st=setStats(sl); const pages=doc.getNumberOfPages();
+  for(let p=1;p<=pages;p++){ doc.setPage(p); doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...C.meta);
+    if(o.footer) doc.text(`${st.n} Songs${st.t?'  ·  ca. '+fmtDur(st.t):''}`,M,H-M+6);
+    if(pages>1) doc.text(`Seite ${p}/${pages}`,W-M,H-M+6,{align:'right'}); }
+  return doc;
+}
+function fileBase(sl){ return ([sl.date,sl.name||'Setliste'].filter(Boolean).join(' ')).replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/Ä/g,'Ae').replace(/Ö/g,'Oe').replace(/Ü/g,'Ue').replace(/ß/g,'ss').replace(/[^A-Za-z0-9 ._()-]+/g,'').replace(/ +/g,' ').trim()||'Setliste'; }
+const PDF_FIELDS=[['color','🎨 Farbig'],['myNotes','Meine Notizen / Akkorde'],['ctrl','CTRL-Hinweise (rot &amp; fett)'],['numbers','Nummern'],['artist','Interpret'],['key','Tonart'],['preset','Mein Preset'],['tuning','Stimmung'],['bpm','Tempo (BPM)'],['dur','Songlänge'],['gigNotes','Gig-Notizen (nur diese Setliste)'],['songNotes','Song-Notizen (für alle)'],['breaks','Pausen &amp; Zugabe'],['footer','Anzahl &amp; Gesamtzeit unten']];
+const PDF_QUICK={stage:{color:true,layout:'list',myNotes:false,ctrl:false,numbers:true,artist:false,key:false,preset:false,tuning:false,bpm:false,dur:false,gigNotes:false,songNotes:false,breaks:true,footer:false,size:'auto'},
+  guitar:{color:true,layout:'notes',myNotes:true,ctrl:true,numbers:true,artist:false,key:true,preset:true,tuning:true,bpm:false,dur:false,gigNotes:true,songNotes:false,breaks:true,footer:false,size:'auto'},
+  full:{color:true,layout:'notes',myNotes:true,ctrl:true,numbers:true,artist:true,key:true,preset:true,tuning:true,bpm:true,dur:true,gigNotes:true,songNotes:true,breaks:true,footer:true,size:'auto'}};
+function pdfDialog(sl){
+  if(!window.jspdf){ toast('PDF-Baustein lädt nicht – Internetverbindung prüfen.'); return; }
+  const o=getPdfOpts();
+  modal(`<h2>Drucken – ${esc(sl.name||'Setliste')}</h2>
+    <p class="stats">Was soll aufs Blatt? Deine Auswahl wird für dich gemerkt.</p>
+    <div class="row" style="margin-bottom:10px"><span class="stats" style="margin:0">Schnellwahl:</span><button class="btn sm" data-q="stage">Nur Titel</button><button class="btn sm" data-q="guitar">Gitarre (Preset, Tonart, Notizen)</button><button class="btn sm" data-q="full">Alles</button></div>
+    <div class="mgrid" style="gap:0 14px">${PDF_FIELDS.map(([k,l])=>`<label class="check"><input type="checkbox" name="${k}" ${o[k]?'checked':''}> ${l}</label>`).join('')}</div>
+    <div style="margin-top:12px"><label class="f">Aufbau</label><select name="layout">
+      <option value="notes" ${o.layout==='notes'?'selected':''}>Songs links, Notizen rechts</option>
+      <option value="list" ${o.layout==='list'?'selected':''}>Nur Songliste (Notizen klein unter dem Titel)</option></select></div>
+    <div style="margin-top:10px"><label class="f">Schriftgröße</label><select name="size">
+      <option value="auto" ${o.size==='auto'?'selected':''}>So groß wie möglich (eine Seite)</option>
+      <option value="l" ${o.size==='l'?'selected':''}>Groß</option>
+      <option value="m" ${o.size==='m'?'selected':''}>Mittel</option></select></div>
+    <div class="mfoot"><button class="btn" data-x="c">Abbrechen</button><button class="btn pri" data-x="go">PDF erstellen</button></div>`,(m,close)=>{
+    const apply=v=>{ PDF_FIELDS.forEach(([k])=>m.querySelector(`[name=${k}]`).checked=!!v[k]); m.querySelector('[name=size]').value=v.size||'auto'; m.querySelector('[name=layout]').value=v.layout||'notes'; };
+    m.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>apply(PDF_QUICK[b.dataset.q]));
+    m.querySelector('[data-x=c]').onclick=close;
+    m.querySelector('[data-x=go]').onclick=()=>{
+      const v={}; PDF_FIELDS.forEach(([k])=>v[k]=m.querySelector(`[name=${k}]`).checked); v.size=m.querySelector('[name=size]').value; v.layout=m.querySelector('[name=layout]').value;
+      if(me){ state.settings.pdfUser[me]=v; commit(false); }
+      close(); pdfPreview(sl,v);
+    };
+  });
+}
+const PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+let pdfjsP=null;
+function loadScript(src){ return new Promise((res,rej)=>{ const el=document.createElement('script'); el.src=src; el.onload=res; el.onerror=rej; document.head.appendChild(el); }); }
+function loadPdfjs(){
+  if(!pdfjsP) pdfjsP=(async()=>{
+    if(!window.pdfjsWorker) await loadScript(PDFJS+'pdf.worker.min.js');   // läuft im Hauptthread (kein Web-Worker nötig)
+    if(!window.pdfjsLib) await loadScript(PDFJS+'pdf.min.js');
+    const lib=window.pdfjsLib; if(!lib) throw new Error('pdf.js fehlt');
+    try{ lib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'; }catch(e){}
+    return lib;
+  })().catch(e=>{ pdfjsP=null; throw e; });
+  return pdfjsP;
+}
+async function renderPreview(blob,box){
+  try{
+    const lib=await loadPdfjs();
+    const pdf=await lib.getDocument({data:new Uint8Array(await blob.arrayBuffer()),isEvalSupported:false}).promise;
+    box.innerHTML='';
+    const w=Math.max(280,box.clientWidth-24), dpr=Math.min(2.5,window.devicePixelRatio||1);
+    for(let i=1;i<=pdf.numPages;i++){
+      const page=await pdf.getPage(i); const v0=page.getViewport({scale:1});
+      const vp=page.getViewport({scale:(w/v0.width)*dpr});
+      const c=document.createElement('canvas'); c.width=Math.round(vp.width); c.height=Math.round(vp.height); c.style.width=w+'px';
+      box.appendChild(c);
+      await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+    }
+  }catch(e){ box.innerHTML='<div class="pvmsg">Die Vorschau lässt sich hier nicht anzeigen.<br>Das PDF selbst ist fertig – einfach herunterladen.</div>'; }
+}
+function pdfPreview(sl,o){
+  let doc; try{ doc=buildPdf(sl,o); }catch(e){ toast('PDF konnte nicht erstellt werden.'); return; }
+  const blob=doc.output('blob'); const url=URL.createObjectURL(blob);
+  modal(`<h2>PDF – ${esc(sl.name||'Setliste')}</h2>
+    <div class="pdfprev" id="pv"><div class="pvmsg">Vorschau wird erstellt …</div></div>
+    <p class="stats">${window.claude?'Zum Drucken: PDF herunterladen, öffnen und ausdrucken.':'„Drucken“ öffnet das PDF in einem neuen Tab – dort über das Drucker-Symbol drucken.'}</p>
+    <div class="mfoot"><button class="btn left" data-x="opt">‹ Optionen ändern</button><button class="btn" data-x="c">Schließen</button>${window.claude?'':'<button class="btn" data-x="pr">🖨 Drucken</button>'}<button class="btn pri" data-x="dl">PDF herunterladen</button></div>`,(m,close)=>{
+    const pr=m.querySelector('[data-x=pr]'); if(pr) pr.onclick=()=>{ const w=window.open(url,'_blank'); if(!w) toast('Pop-up blockiert – bitte herunterladen und drucken.'); };
+    renderPreview(blob,m.querySelector('#pv'));
+    const done=()=>{close();setTimeout(()=>URL.revokeObjectURL(url),60000);};
+    m.querySelector('[data-x=c]').onclick=done;
+    m.querySelector('[data-x=opt]').onclick=()=>{done();pdfDialog(sl);};
+    m.querySelector('[data-x=dl]').onclick=async()=>{ const ok=await saveFile(fileBase(sl)+'.pdf',blob); if(!ok && !dlNs) toast('Download ist hier nicht verfügbar – öffne die Seite direkt auf claude.ai.'); };
+  });
+}
+
+/* ---------- stage view ---------- */
+function stageView(sl){
+  const items=sl.items.map(it=>it.type==='break'?{brk:true,enc:isEncore(it),label:it.label||'Pause'}:(()=>{const s=songById(it.songId);return s?{s,note:it.note}:null;})()).filter(Boolean);
+  if(!items.length){ toast('Setliste ist leer.'); return; }
+  let i=0; const el=document.createElement('div'); el.className='stage'; document.body.appendChild(el);
+  const nrOf=k=>items.slice(0,k+1).filter(x=>!x.brk).length;
+  const total=items.filter(x=>!x.brk).length;
+  function draw(){
+    const c=items[i],n=items[i+1];
+    const meta=c.brk?'':[c.s.key,myPreset(c.s.id)&&'Preset '+myPreset(c.s.id),c.s.tuning,c.s.bpm&&c.s.bpm+' BPM'].filter(Boolean).map(esc).join('  ·  ');
+    const note=c.brk?'':(c.note||c.s.notes||'');
+    el.innerHTML=`<div class="top"><span>${esc(sl.name||'')}</span><span>${c.brk?'':nrOf(i)+' / '+total}</span><button class="ico" data-close style="font-size:22px">✕</button></div>
+      <div class="cur" data-next>${c.brk?`<div class="big" style="color:${c.enc?'#ff5252':'var(--acc)'}">${c.enc?'★ ':''}${esc(c.label)}${c.enc?' ★':''}</div>`:`<div class="bnr">${nrOf(i)}</div><div class="big">${esc(c.s.title)}</div>${meta?`<div class="meta">${meta}</div>`:''}${note?`<div class="snote">${esc(note)}</div>`:''}${myCtrl(c.s.id)?`<div class="ctrl">CTRL: ${esc(myCtrl(c.s.id))}</div>`:''}${myNote(c.s.id)?`<div class="chords">${esc(myNote(c.s.id))}</div>`:''}`}</div>
+      <div class="next">${n?`Danach: <b>${esc(n.brk?n.label:n.s.title)}</b>${!n.brk&&myPreset(n.s.id)?' · Preset '+esc(myPreset(n.s.id)):''}`:'Letzter Song 🤘'}</div>
+      <div class="nav"><button class="btn" data-prev>‹ Zurück</button><button class="btn" data-nx>Weiter ›</button></div>`;
+  }
+  const go=d=>{ i=Math.max(0,Math.min(items.length-1,i+d)); draw(); };
+  function close(){ el.remove(); document.removeEventListener('keydown',key); }
+  function key(e){ if(['ArrowRight','ArrowDown',' ','PageDown','Enter'].includes(e.key)){e.preventDefault();go(1);} else if(['ArrowLeft','ArrowUp','PageUp','Backspace'].includes(e.key)){e.preventDefault();go(-1);} else if(e.key==='Escape') close(); }
+  el.addEventListener('click',e=>{ if(e.target.closest('[data-close]')) close(); else if(e.target.closest('[data-prev]')) go(-1); else if(e.target.closest('[data-nx]')||e.target.closest('[data-next]')) go(1); });
+  document.addEventListener('keydown',key);
+  try{ el.requestFullscreen&&el.requestFullscreen().catch(()=>{}); }catch(e){}
+  draw();
+}
+
+/* ---------- events ---------- */
+document.getElementById('nav').addEventListener('click',e=>{ const b=e.target.closest('[data-tab]'); if(b){ ui.tab=b.dataset.tab; render(); } });
+document.getElementById('app').addEventListener('input',e=>{
+  const t=e.target, sl=curSet();
+  if(t.dataset.set && sl){ sl[t.dataset.set]=t.value; commit(false); }
+  else if(t.dataset.ctrl){ setMyCtrl(t.dataset.ctrl,t.value); commit(false); }
+  else if(t.dataset.my){ setMyNote(t.dataset.my,t.value); commit(false); }
+  else if(t.dataset.edit && sl){ const it=sl.items[+t.dataset.i]; if(it){ it[t.dataset.edit]=t.value; commit(false); } }
+});
+document.getElementById('app').addEventListener('change',e=>{ if(e.target.dataset.set){ const a=$('#asideBox'); if(a) a.outerHTML=asideHtml(); } });
+document.getElementById('app').addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]'); if(!b) return;
+  doAct(b);
+});
+async function doAct(b){
+  const act=b.dataset.act, sl=curSet(), i=+b.dataset.i;
+  switch(act){
+    case 'more': moreSheet(); break;
+    case 'addSheet': addSheet(); break;
+    case 'copyMine':{ const c=JSON.parse(JSON.stringify(sl)); c.id=uid(); c.owner=me; c.from=''; c.sourceId=''; c.name=(sl.name||'Setliste'); c.created=Date.now(); c.items.forEach(x=>x.id=uid()); state.setlists.push(c); ui.viewOwner=null; ui.setId=c.id; commit(); toast('Kopie in deinen Setlisten angelegt'); break; }
+    case 'newSet':{ ui.viewOwner=null; const s={id:uid(),owner:me,name:'Neue Setliste',date:new Date().toISOString().slice(0,10),venue:'',items:[],created:Date.now()}; state.setlists.push(s); ui.setId=s.id; commit(); const n=document.querySelector('[data-set=name]'); if(n){n.focus();n.select();} break; }
+    case 'pickSet': ui.setId=b.dataset.id; render(); break;
+    case 'assign': assignDialog(sl); break;
+    case 'dupSet':{ const c=JSON.parse(JSON.stringify(sl)); c.id=uid(); c.owner=me; c.from=''; ui.viewOwner=null; c.name=(sl.name||'Setliste')+' (Kopie)'; c.created=Date.now(); c.items.forEach(x=>x.id=uid()); state.setlists.push(c); ui.setId=c.id; commit(); toast('Kopie angelegt'); break; }
+    case 'delSet': if(await ask(`Setliste „${esc(sl.name)}“ löschen? Die Songs bleiben in deiner Song-Liste.`,'Löschen')){ state.setlists=state.setlists.filter(x=>x.id!==sl.id); ui.setId=null; commit(); } break;
+    case 'addSong': sl.items.push({id:uid(),type:'song',songId:b.dataset.id,note:''}); commit(); { const q=$('#addQ'); if(q&&ui.addQ){ q.focus(); q.select(); } } break;
+    case 'quickNew': songDialog(null,s=>{ curSet().items.push({id:uid(),type:'song',songId:s.id,note:''}); ui.addQ=''; }); setTimeout(()=>{ const t=document.querySelector('.modal [name=title]'); if(t) t.value=ui.addQ.trim(); },0); break;
+    case 'addEncore': sl.items.push({id:uid(),type:'break',kind:'encore',label:'Zugabe'}); commit(); break;
+    case 'addBreak':{ const n=sl.items.filter(x=>x.type==='break').length; sl.items.push({id:uid(),type:'break',kind:'break',label:n?'Pause '+(n+1):'Pause'}); commit(); break; }
+    case 'rm': sl.items.splice(i,1); commit(); break;
+    case 'openNote': ui.openNote=b.dataset.id; render(); { const ta=document.querySelector('.mynote'); if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); } } break;
+    case 'closeNote': ui.openNote=null; render(); break;
+    case 'up': if(i>0){ [sl.items[i-1],sl.items[i]]=[sl.items[i],sl.items[i-1]]; commit(); } break;
+    case 'down': if(i<sl.items.length-1){ [sl.items[i+1],sl.items[i]]=[sl.items[i],sl.items[i+1]]; commit(); } break;
+    case 'editSong': songDialog(songById(b.dataset.id)); break;
+    case 'newSong': songDialog(null); break;
+    case 'bulk': bulkDialog(); break;
+    case 'pdf': pdfDialog(sl); break;
+    case 'stage': stageView(sl); break;
+    case 'copyText':{ const txt=setAsText(sl); try{ await navigator.clipboard.writeText(txt); toast('Setliste kopiert – z. B. in WhatsApp einfügen'); }catch(err){ modal(`<h2>Setliste als Text</h2><textarea rows="14" readonly>${esc(txt)}</textarea><div class="mfoot"><button class="btn pri" data-x>Schließen</button></div>`,(m,close)=>{ m.querySelector('[data-x]').onclick=close; const ta=m.querySelector('textarea'); ta.focus(); ta.select(); }); } break; }
+    case 'exportJson':{ const ok=await saveFile('setlist-backup-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(state,null,2)); if(!ok&&!dlNs) toast('Download ist hier nicht verfügbar.'); break; }
+    case 'exportCsv':{ const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"'; const csv='﻿Titel;Interpret;Tonart;Mein Preset;Stimmung;BPM;Länge;Notizen\n'+state.songs.map(s=>[s.title,s.artist,s.key,myPreset(s.id),s.tuning,s.bpm,fmtDur(s.dur),s.notes].map(q).join(';')).join('\n'); const ok=await saveFile('songs.csv',csv); if(!ok&&!dlNs) toast('Download ist hier nicht verfügbar.'); break; }
+  }
+}
+
+
+function pickUser(force){
+  modal(`<h2>Wer bist du?</h2><p class="stats">Du siehst dann nur deine eigenen Setlisten. Wechseln kannst du jederzeit oben rechts.</p><div class="pickgrid">${MEMBERS.map(n=>`<button class="btn ${n===me?'pri':''}" data-n="${n}">${n}</button>`).join('')}</div>`,(m,close)=>{
+    m.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{ setMe(b.dataset.n); close(); });
+  },!!force);
+}
+function setMe(n){ me=n; try{localStorage.setItem('setlist-user',n);}catch(e){} ui.setId=null; if(!RM&&!hasFirebase()&&movePresetsTo(me)) commit(false); render(); }
+document.getElementById('who').addEventListener('change',e=>{ if(RM){ ui.viewOwner=e.target.value||null; ui.setId=null; render(); return; } if(MEMBERS.includes(e.target.value)) setMe(e.target.value); });
+loadLocal(); if(me&&!hasFirebase()&&movePresetsTo(me)) saveLocal(); render(); initCloud(); if(!me&&!hasFirebase()) pickUser(true);
+})();
+</script>
+</body>
+</html>

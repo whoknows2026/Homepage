@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /admin.html
+
+# TODO: Adresse durch eure echte GitHub-Pages-Adresse ersetzen
+Sitemap: https://euer-github-nutzername.github.io/who-knows-website/sitemap.xml
