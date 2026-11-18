@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SITEMAP
+  ---------------------------------------------------------------------------
+  Hilft Suchmaschinen, die Seite zu finden. Es gibt nur eine öffentliche
+  Seite (die Startseite mit allen Bereichen als Anker); admin.html ist
+  bewusst NICHT aufgeführt und zusätzlich in robots.txt gesperrt.
+
+  TODO vor dem Livegang: Die Adresse unten durch eure echte
+  GitHub-Pages-Adresse ersetzen, z. B.
+  https://euer-github-nutzername.github.io/who-knows-website/
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://euer-github-nutzername.github.io/who-knows-website/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>
